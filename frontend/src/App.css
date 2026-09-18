@@ -1,0 +1,97 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #15161c;
+  color: #e5e7eb;
+  font-family: Arial, sans-serif;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+header {
+  padding: 20px 30px;
+  border-bottom: 1px solid #30323d;
+}
+
+header h1 {
+  margin: 0;
+}
+
+header p {
+  margin: 5px 0 0;
+  color: #9296a5;
+}
+
+.upload {
+  padding: 15px 30px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #30323d;
+}
+
+button {
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 220px 1fr 280px;
+  height: calc(100vh - 125px);
+}
+
+.panel {
+  padding: 18px;
+  overflow: auto;
+  border-right: 1px solid #30323d;
+}
+
+.tree-panel {
+  background: #191a21;
+}
+
+.code-panel {
+  background: #101116;
+}
+
+.analysis-panel {
+  background: #191a21;
+  border-right: none;
+}
+
+.file,
+.folder {
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.file:hover,
+.folder:hover {
+  background: #292b35;
+}
+
+pre {
+  white-space: pre-wrap;
+  font-family: Consolas, monospace;
+  line-height: 1.6;
+}
+
+h3 {
+  margin-top: 0;
+}
+
+h4 {
+  margin-bottom: 5px;
+}
+
+.error {
+  padding: 10px 30px;
+  color: #ff6b6b;
+}
+
