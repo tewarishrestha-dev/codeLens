@@ -19,11 +19,13 @@ def build_call_graph(code_analysis):
 
         for call in data["calls"]:
             targets = functions.get(call["calls"], [])
+
             target = targets[0] if len(targets) == 1 else targets
 
             graph[file_path].append({
                 "function": call["function"],
                 "calls": call["calls"],
+                "line": call["line"],
                 "target_file": target
             })
 

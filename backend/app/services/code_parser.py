@@ -25,14 +25,16 @@ def parse_python_file(file_path: Path):
                     if isinstance(child.func, ast.Name):
                         calls.append({
                             "function": node.name,
-                            "calls": child.func.id
+                            "calls": child.func.id,
+                            "line": child.lineno
                         })
+
                     elif isinstance(child.func, ast.Attribute):
                         calls.append({
                             "function": node.name,
-                            "calls": child.func.attr
+                            "calls": child.func.attr,
+                            "line": child.lineno
                         })
-
     for node in tree.body:
         if isinstance(node, ast.Import):
             for alias in node.names:
