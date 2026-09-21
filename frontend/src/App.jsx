@@ -11,6 +11,18 @@ const API_URL = "http://127.0.0.1:8000";
 function FileTree({ node, onFileClick, selectedFile }) {
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (selectedFile && node.type === "directory") {
+      const containsSelected = selectedFile.startsWith(
+        node.path.split("/").slice(1).join("/") + "/"
+      );
+
+      if (containsSelected) {
+        setOpen(true);
+      }
+    }
+  }, [selectedFile]);
+
   if (node.type === "file") {
     const isSelected = node.path.split("/").slice(1).join("/") === selectedFile;
 
