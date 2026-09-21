@@ -10,6 +10,7 @@ from backend.app.services.file_reader import read_file
 from backend.app.services.repository_store import save_repository
 from backend.app.services.repository_store import get_repository
 from backend.app.services.repository_analyzer import analyze_repository
+from backend.app.services.call_analyzer import build_execution_flow
 import tempfile
 
 app = FastAPI()
@@ -76,7 +77,8 @@ def analyze_zip(file: UploadFile = File(...)):
         analysis["tree"],
         analysis["code_analysis"],
         analysis["dependencies"],
-        analysis["call_graph"]
+        analysis["call_graph"],
+        analysis["entry_points"]
     )
 
     return {
@@ -85,7 +87,8 @@ def analyze_zip(file: UploadFile = File(...)):
         "tree": analysis["tree"],
         "code_analysis": analysis["code_analysis"],
         "dependencies": analysis["dependencies"],
-        "call_graph": analysis["call_graph"]
+        "call_graph": analysis["call_graph"],
+        "entry_points": analysis["entry_points"]
     }
 
 @app.get("/file")
@@ -156,3 +159,23 @@ def get_call_graph(repository_id: str):
         "repository_id": repository_id,
         "call_graph": repository["call_graph"]
     }
+
+@app.get("/repository/{repository_id}/flow")
+def get_execution_flow(repository_id: str, entry_point: str):
+    repository = get_repository(repository_id)
+
+    if repository is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found"
+        )
+
+    flow = build_execution_flow(
+        repository["call_graph"],
+        entry_point
+    )
+
+    return {
+    "entry_point": entry_point,
+    "steps": flow
+}

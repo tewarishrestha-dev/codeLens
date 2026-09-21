@@ -181,12 +181,57 @@ function DependencyGraph({ result, onFileClick, selectedFile }) {
   );
 }
 
+function ExecutionFlow({ executionFlow, onFileClick }) {
+  const nodes = executionFlow.map((step, index) => ({
+    id: String(index),
+    position: {
+      x: 250,
+      y: index * 100,
+    },
+    data: {
+      label: step.function ? `${step.file} → ${step.function}()` : step.file,
+    },
+    style: {
+      background: "#191a21",
+      color: "#e5e7eb",
+      border: "1px solid #444",
+      borderRadius: "6px",
+      padding: "10px",
+    },
+  }));
+
+  const edges = executionFlow.slice(1).map((_, index) => ({
+    id: `flow-${index}`,
+    source: String(index),
+    target: String(index + 1),
+  }));
+
+  return (
+    <div style={{ height: "400px" }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodeClick={(event, node) => {
+          const step = executionFlow[Number(node.id)];
+
+          onFileClick(`${step.file}`, step.line);
+        }}
+        fitView
+      >
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
+
 function App() {
   const [file, setFile] = useState(null);
   const [githubUrl, setGithubUrl] = useState("");
   const [result, setResult] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileContent, setFileContent] = useState("");
+  const [executionFlow, setExecutionFlow] = useState([]);
   const [fileAnalysis, setFileAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -244,6 +289,10 @@ function App() {
       });
 
       setResult(data);
+
+      if (data.entry_points?.length) {
+        loadExecutionFlow(data.entry_points[0], data.repository_id);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -300,6 +349,10 @@ function App() {
       });
 
       setResult(data);
+
+      if (data.entry_points?.length) {
+        loadExecutionFlow(data.entry_points[0], data.repository_id);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -326,6 +379,24 @@ function App() {
       setTargetLine(line);
       setHighlightLine(line);
       setFileAnalysis(result.code_analysis[relativePath]);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function loadExecutionFlow(entryPoint, repositoryId) {
+    try {
+      const response = await fetch(
+        `${API_URL}/repository/${repositoryId}/flow?entry_point=${encodeURIComponent(entryPoint)}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to load execution flow");
+      }
+
+      const data = await response.json();
+
+      setExecutionFlow(data.steps);
     } catch (err) {
       setError(err.message);
     }
@@ -404,6 +475,10 @@ function App() {
             <div>
               <strong>{stats?.dependencies || 0}</strong>
               <span>Dependencies</span>
+            </div>
+            <div>
+              <strong>{result?.entry_points?.length || 0}</strong>
+              <span>Entry Points</span>
             </div>
           </div>
 
@@ -530,7 +605,6 @@ function App() {
                   </ul>
 
                   <h4>Calls</h4>
-
                   <ul>
                     {(result.call_graph[selectedFile] || []).map(
                       (call, index) => (
@@ -539,7 +613,7 @@ function App() {
                           onClick={() =>
                             openFile(
                               `${result.tree.name}/${call.target_file}`,
-                              1
+                              call.target_line
                             )
                           }
                           style={{ cursor: "pointer" }}
@@ -552,6 +626,31 @@ function App() {
                 </>
               ) : (
                 <p>Select a file to inspect it.</p>
+              )}
+
+              <h4>Entry Points</h4>
+
+              <ul>
+                {(result.entry_points || []).map((file) => (
+                  <li
+                    key={file}
+                    onClick={() => openFile(`${result.tree.name}/${file}`)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {file}
+                  </li>
+                ))}
+              </ul>
+
+              <h4>Execution Flow</h4>
+
+              {executionFlow.length === 0 ? (
+                <p>-</p>
+              ) : (
+                <ExecutionFlow
+                  executionFlow={executionFlow}
+                  onFileClick={openFile}
+                />
               )}
 
               <h4>Dependencies</h4>

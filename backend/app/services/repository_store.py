@@ -3,7 +3,15 @@ import uuid
 
 repositories = {}
 
-def save_repository(repo_path, repo_name, tree, code_analysis, dependencies, call_graph):
+def save_repository(
+    repo_path,
+    repo_name,
+    tree,
+    code_analysis,
+    dependencies,
+    call_graph,
+    entry_points
+):
     repository_id = str(uuid.uuid4())
 
     repositories[repository_id] = {
@@ -13,6 +21,7 @@ def save_repository(repo_path, repo_name, tree, code_analysis, dependencies, cal
         "code_analysis": code_analysis,
         "dependencies": dependencies,
         "call_graph": call_graph,
+        "entry_points": entry_points,
     }
 
     return repository_id
