@@ -10,7 +10,8 @@ def save_repository(
     code_analysis,
     dependencies,
     call_graph,
-    entry_points
+    entry_points,
+    architecture
 ):
     repository_id = str(uuid.uuid4())
 
@@ -22,6 +23,7 @@ def save_repository(
         "dependencies": dependencies,
         "call_graph": call_graph,
         "entry_points": entry_points,
+        "architecture": architecture,
     }
 
     return repository_id

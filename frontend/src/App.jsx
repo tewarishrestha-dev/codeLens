@@ -139,7 +139,25 @@ function DependencyGraph({ result, onFileClick, selectedFile }) {
         y: position.y - 25,
       },
       data: {
-        label: file,
+        label: (
+          <div>
+            <strong>{file}</strong>
+
+            <div style={{ marginTop: "6px", fontSize: "12px" }}>
+              {result.architecture.functions
+                .filter((item) => item.file === file)
+                .map((item) => (
+                  <div key={`function-${item.name}`}>{item.name}()</div>
+                ))}
+
+              {result.architecture.classes
+                .filter((item) => item.file === file)
+                .map((item) => (
+                  <div key={`class-${item.name}`}>class {item.name}</div>
+                ))}
+            </div>
+          </div>
+        ),
       },
       style: {
         opacity: isRelated ? 1 : 0.25,
@@ -169,6 +187,50 @@ function DependencyGraph({ result, onFileClick, selectedFile }) {
       <ReactFlow
         nodes={nodes}
         edges={styledEdges}
+        onNodeClick={(event, node) => {
+          onFileClick(`${result.tree.name}/${node.id}`);
+        }}
+        fitView
+      >
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
+
+function ArchitectureGraph({ result, onFileClick }) {
+  const files = result.architecture.files;
+
+  const nodes = files.map((file, index) => ({
+    id: file,
+    position: {
+      x: (index % 3) * 220,
+      y: Math.floor(index / 3) * 120,
+    },
+    data: {
+      label: file,
+    },
+    style: {
+      background: "#191a21",
+      color: "#e5e7eb",
+      border: "1px solid #444",
+      borderRadius: "6px",
+      padding: "10px",
+    },
+  }));
+
+  const edges = result.architecture.dependencies.map((dependency, index) => ({
+    id: `architecture-${index}`,
+    source: dependency.from,
+    target: dependency.to,
+  }));
+
+  return (
+    <div style={{ height: "400px" }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
         onNodeClick={(event, node) => {
           onFileClick(`${result.tree.name}/${node.id}`);
         }}
@@ -457,6 +519,127 @@ function App() {
               <span>Files</span>
             </div>
 
+            <div className="architecture-panel">
+              <h3>Architecture Overview</h3>
+
+              <div className="architecture-grid">
+                <div>
+                  <strong>{result.architecture.file_count}</strong>
+                  <span>Files</span>
+                </div>
+
+                <div>
+                  <strong>{result.architecture.function_count}</strong>
+                  <span>Functions</span>
+                </div>
+
+                <div>
+                  <strong>{result.architecture.class_count}</strong>
+                  <span>Classes</span>
+                </div>
+
+                <div>
+                  <strong>{result.architecture.dependency_count}</strong>
+                  <span>Dependencies</span>
+                </div>
+              </div>
+
+              <div className="architecture-section">
+                <h4>Architecture Graph</h4>
+
+                <ArchitectureGraph result={result} onFileClick={openFile} />
+              </div>
+
+              <div className="architecture-section">
+                <h4>Entry Points</h4>
+
+                {result.architecture.entry_points.length === 0 ? (
+                  <p>None detected</p>
+                ) : (
+                  <ul>
+                    {result.architecture.entry_points.map((file) => (
+                      <li key={file}>{file}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="architecture-section">
+                <h4>Functions</h4>
+
+                {result.architecture.functions.length === 0 ? (
+                  <p>None detected</p>
+                ) : (
+                  <ul>
+                    {result.architecture.functions.map((functionItem) => (
+                      <li
+                        key={`${functionItem.file}-${functionItem.name}`}
+                        onClick={() =>
+                          openFile(
+                            `${result.tree.name}/${functionItem.file}`,
+                            functionItem.line
+                          )
+                        }
+                        style={{ cursor: "pointer" }}
+                      >
+                        {functionItem.name}() — {functionItem.file}:
+                        {functionItem.line}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="architecture-section">
+                <h4>Classes</h4>
+
+                {result.architecture.classes.length === 0 ? (
+                  <p>None detected</p>
+                ) : (
+                  <ul>
+                    {result.architecture.classes.map((classItem) => (
+                      <li
+                        key={`${classItem.file}-${classItem.name}`}
+                        onClick={() =>
+                          openFile(
+                            `${result.tree.name}/${classItem.file}`,
+                            classItem.line
+                          )
+                        }
+                        style={{ cursor: "pointer" }}
+                      >
+                        {classItem.name} — {classItem.file}:{classItem.line}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="architecture-section">
+                <h4>Module Dependencies</h4>
+
+                {result.architecture.dependencies.length === 0 ? (
+                  <p>None detected</p>
+                ) : (
+                  <ul>
+                    {result.architecture.dependencies.map(
+                      (dependency, index) => (
+                        <li
+                          key={index}
+                          onClick={() =>
+                            openFile(`${result.tree.name}/${dependency.to}`)
+                          }
+                          style={{ cursor: "pointer" }}
+                        >
+                          {dependency.from} → {dependency.to}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+
             <div>
               <strong>{stats?.python || 0}</strong>
               <span>Python</span>
@@ -605,24 +788,36 @@ function App() {
                   </ul>
 
                   <h4>Calls</h4>
-                  <ul>
-                    {(result.call_graph[selectedFile] || []).map(
-                      (call, index) => (
-                        <li
-                          key={index}
-                          onClick={() =>
-                            openFile(
-                              `${result.tree.name}/${call.target_file}`,
-                              call.target_line
-                            )
-                          }
-                          style={{ cursor: "pointer" }}
-                        >
-                          {call.function} → {call.calls} — line {call.line}
-                        </li>
-                      )
-                    )}
-                  </ul>
+
+                  {selectedFile && (
+                    <ul>
+                      {Object.entries(
+                        result.call_graph[selectedFile] || {}
+                      ).map(([functionName, calls]) =>
+                        calls.map((call, index) => (
+                          <li
+                            key={`${functionName}-${index}`}
+                            onClick={() => {
+                              if (typeof call.target_file === "string") {
+                                openFile(
+                                  `${result.tree.name}/${call.target_file}`,
+                                  call.target_line
+                                );
+                              }
+                            }}
+                            style={{
+                              cursor:
+                                typeof call.target_file === "string"
+                                  ? "pointer"
+                                  : "default",
+                            }}
+                          >
+                            {functionName}() → {call.calls} — line {call.line}
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
                 </>
               ) : (
                 <p>Select a file to inspect it.</p>

@@ -79,15 +79,10 @@ def build_execution_flow(call_graph, entry_point):
 
         functions = call_graph.get(file_path, {})
 
-        if not function_name:
-            for function in functions:
-                walk(file_path, function)
-
+        if function_name is None:
             return
 
-        calls = functions.get(function_name, [])
-        
-        for call in calls:
+        for call in functions.get(function_name, []):
             target_file = call["target_file"]
 
             if not isinstance(target_file, str):
@@ -99,6 +94,23 @@ def build_execution_flow(call_graph, entry_point):
                 call.get("target_line")
             )
 
-    walk(entry_point)
+    # Find functions that are never called by another function.
+    called_functions = set()
+
+    for file_functions in call_graph.values():
+        for calls in file_functions.values():
+            for call in calls:
+                called_functions.add(call["calls"])
+
+    entry_file_functions = call_graph.get(entry_point, {})
+
+    root_functions = [
+        name
+        for name in entry_file_functions
+        if name not in called_functions
+    ]
+
+    for function_name in root_functions:
+        walk(entry_point, function_name)
 
     return flow

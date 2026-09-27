@@ -4,6 +4,7 @@ from .repository_scanner import scan_repository
 from .repository_parser import parse_repository
 from .dependency_analyzer import build_dependencies
 from .call_analyzer import build_call_graph
+from .architecture_analyzer import build_architecture_summary
 
 ENTRY_POINTS = {
     "main.py",
@@ -22,10 +23,20 @@ def analyze_repository(repo_path: Path):
         if Path(path).name in ENTRY_POINTS
     ]
 
+    dependencies = build_dependencies(code_analysis)
+    call_graph = build_call_graph(code_analysis)
+
+    architecture = build_architecture_summary(
+        code_analysis,
+        dependencies,
+        entry_points,
+    )
+
     return {
-    "tree": scan_repository(repo_path),
-    "code_analysis": code_analysis,
-    "dependencies": build_dependencies(code_analysis),
-    "call_graph": build_call_graph(code_analysis),
-    "entry_points": entry_points
-}
+        "tree": scan_repository(repo_path),
+        "code_analysis": code_analysis,
+        "dependencies": dependencies,
+        "call_graph": call_graph,
+        "entry_points": entry_points,
+        "architecture": architecture,
+    }

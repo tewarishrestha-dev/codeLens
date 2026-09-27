@@ -138,3 +138,51 @@ h4 {
   color: #61dafb;
   border-left: 3px solid #61dafb;
 }
+
+.architecture-panel {
+  padding: 20px 30px;
+  border-bottom: 1px solid #30323d;
+  background: #191a21;
+}
+
+.architecture-panel h3 {
+  margin: 0 0 16px;
+}
+
+.architecture-grid {
+  display: flex;
+  gap: 40px;
+}
+
+.architecture-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.architecture-grid strong {
+  font-size: 20px;
+}
+
+.architecture-grid span {
+  color: #9296a5;
+  font-size: 13px;
+}
+
+.architecture-section {
+  margin-top: 20px;
+}
+
+.architecture-section h4 {
+  margin-bottom: 8px;
+}
+
+.architecture-section ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.architecture-section li {
+  margin: 5px 0;
+  color: #c7cad4;
+}

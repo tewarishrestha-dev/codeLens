@@ -37,6 +37,7 @@ def health():
 @app.post("/analyze/github")
 def analyze_github(request: GitHubRequest):
     repo_path, repo_name = clone_repository(request.url)
+
     analysis = analyze_repository(repo_path)
     analysis["tree"]["name"] = repo_name
 
@@ -46,7 +47,9 @@ def analyze_github(request: GitHubRequest):
         analysis["tree"],
         analysis["code_analysis"],
         analysis["dependencies"],
-        analysis["call_graph"]
+        analysis["call_graph"],
+        analysis["entry_points"],
+        analysis["architecture"]
     )
 
     return {
@@ -55,7 +58,9 @@ def analyze_github(request: GitHubRequest):
         "tree": analysis["tree"],
         "code_analysis": analysis["code_analysis"],
         "dependencies": analysis["dependencies"],
-        "call_graph": analysis["call_graph"]
+        "call_graph": analysis["call_graph"],
+        "entry_points": analysis["entry_points"],
+        "architecture": analysis["architecture"]
     }
 
 @app.post("/analyze/zip")
@@ -78,7 +83,8 @@ def analyze_zip(file: UploadFile = File(...)):
         analysis["code_analysis"],
         analysis["dependencies"],
         analysis["call_graph"],
-        analysis["entry_points"]
+        analysis["entry_points"],
+        analysis["architecture"]
     )
 
     return {
@@ -88,7 +94,8 @@ def analyze_zip(file: UploadFile = File(...)):
         "code_analysis": analysis["code_analysis"],
         "dependencies": analysis["dependencies"],
         "call_graph": analysis["call_graph"],
-        "entry_points": analysis["entry_points"]
+        "entry_points": analysis["entry_points"],
+        "architecture": analysis["architecture"],
     }
 
 @app.get("/file")
