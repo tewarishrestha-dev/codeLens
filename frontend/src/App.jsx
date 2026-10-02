@@ -201,24 +201,61 @@ function DependencyGraph({ result, onFileClick, selectedFile }) {
 
 function ArchitectureGraph({ result, onFileClick }) {
   const files = result.architecture.files;
+  const directories = result.architecture.directories;
 
-  const nodes = files.map((file, index) => ({
-    id: file,
-    position: {
-      x: (index % 3) * 220,
-      y: Math.floor(index / 3) * 120,
-    },
-    data: {
-      label: file,
-    },
-    style: {
-      background: "#191a21",
-      color: "#e5e7eb",
-      border: "1px solid #444",
-      borderRadius: "6px",
-      padding: "10px",
-    },
-  }));
+  const nodes = files.map((file, index) => {
+    const directory =
+      Object.entries(directories).find(([, moduleFiles]) =>
+        moduleFiles.includes(file)
+      )?.[0] || "root";
+
+    return {
+      id: file,
+      position: {
+        x: (index % 3) * 240,
+        y: Math.floor(index / 3) * 130,
+      },
+      data: {
+        label: (
+          <div>
+            <strong>{file}</strong>
+
+            <div
+              style={{
+                marginTop: "4px",
+                fontSize: "11px",
+                color: "#9296a5",
+              }}
+            >
+              {directory}/
+            </div>
+
+            <div style={{ marginTop: "6px", fontSize: "12px" }}>
+              {result.architecture.functions
+                .filter((item) => item.file === file)
+                .map((item) => (
+                  <div key={`function-${item.name}`}>{item.name}()</div>
+                ))}
+
+              {result.architecture.classes
+                .filter((item) => item.file === file)
+                .map((item) => (
+                  <div key={`class-${item.name}`}>class {item.name}</div>
+                ))}
+            </div>
+          </div>
+        ),
+      },
+      style: {
+        background: "#191a21",
+        color: "#e5e7eb",
+        border: "1px solid #444",
+        borderRadius: "6px",
+        padding: "10px",
+        boxShadow: `0 0 0 1px ${directory === "root" ? "#444" : "#61dafb"}`,
+      },
+    };
+  });
 
   const edges = result.architecture.dependencies.map((dependency, index) => ({
     id: `architecture-${index}`,
@@ -297,6 +334,13 @@ function App() {
   const [fileAnalysis, setFileAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [summary, setSummary] = useState("");
+  const [summarizing, setSummarizing] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [stats, setStats] = useState(null);
   const codeRef = useRef(null);
   const [targetLine, setTargetLine] = useState(null);
@@ -464,6 +508,75 @@ function App() {
     }
   }
 
+  async function searchRepository() {
+    if (!searchQuery.trim() || !result) return;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/repository/${result.repository_id}/search?query=${encodeURIComponent(searchQuery)}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Search failed");
+      }
+
+      const data = await response.json();
+
+      setSearchResults(data.results);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function askCodebase() {
+    if (!question.trim() || !result) return;
+
+    setAsking(true);
+    setAnswer("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/repository/${result.repository_id}/ask?question=${encodeURIComponent(question)}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to ask CodeLens");
+      }
+
+      const data = await response.json();
+
+      setAnswer(data.answer);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  async function summarizeCodebase() {
+    if (!result) return;
+
+    setSummarizing(true);
+    setSummary("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/repository/${result.repository_id}/summary`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to summarize codebase");
+      }
+
+      const data = await response.json();
+      setSummary(data.summary);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
   useEffect(() => {
     if (!targetLine || !codeRef.current) return;
 
@@ -542,6 +655,11 @@ function App() {
                   <strong>{result.architecture.dependency_count}</strong>
                   <span>Dependencies</span>
                 </div>
+
+                <div>
+                  <strong>{result.architecture.directory_count}</strong>
+                  <span>Modules</span>
+                </div>
               </div>
 
               <div className="architecture-section">
@@ -616,6 +734,34 @@ function App() {
               </div>
 
               <div className="architecture-section">
+                <h4>Modules</h4>
+
+                <ul>
+                  {Object.entries(result.architecture.directories).map(
+                    ([directory, files]) => (
+                      <li key={directory}>
+                        <strong>{directory}/</strong>
+
+                        <ul>
+                          {files.map((file) => (
+                            <li
+                              key={file}
+                              onClick={() =>
+                                openFile(`${result.tree.name}/${file}`)
+                              }
+                              style={{ cursor: "pointer" }}
+                            >
+                              {file}
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+
+              <div className="architecture-section">
                 <h4>Module Dependencies</h4>
 
                 {result.architecture.dependencies.length === 0 ? (
@@ -638,6 +784,98 @@ function App() {
                   </ul>
                 )}
               </div>
+            </div>
+
+            <div className="code-search">
+              <input
+                type="text"
+                placeholder="Search codebase..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    searchRepository();
+                  }
+                }}
+              />
+
+              <button onClick={searchRepository}>Search</button>
+            </div>
+
+            {searchResults.length > 0 && (
+              <div className="search-results">
+                {searchResults.map((item) => (
+                  <div
+                    key={item.file}
+                    onClick={() => openFile(`${result.tree.name}/${item.file}`)}
+                  >
+                    <strong>{item.file}</strong>
+
+                    {item.matches.map((match, index) => (
+                      <div
+                        key={index}
+                        onClick={(event) => {
+                          event.stopPropagation();
+
+                          openFile(
+                            `${result.tree.name}/${item.file}`,
+                            match.line
+                          );
+                        }}
+                        style={{
+                          cursor: match.line ? "pointer" : "default",
+                        }}
+                      >
+                        {match.type}: {match.name}
+                        {match.line && ` — line ${match.line}`}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="project-summary">
+              <h3>Project Understanding</h3>
+
+              <button onClick={summarizeCodebase} disabled={summarizing}>
+                {summarizing ? "Analyzing..." : "Understand Project"}
+              </button>
+
+              {summary && (
+                <div className="codebase-answer">
+                  <strong>CodeLens:</strong>
+                  <p style={{ whiteSpace: "pre-wrap" }}>{summary}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="ask-codebase">
+              <h3>Ask Codebase</h3>
+
+              <div>
+                <input
+                  type="text"
+                  placeholder="Ask about this codebase..."
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      askCodebase();
+                    }
+                  }}
+                />
+
+                <button onClick={askCodebase} disabled={asking}>
+                  {asking ? "Asking..." : "Ask"}
+                </button>
+              </div>
+
+              {answer && (
+                <div className="codebase-answer">
+                  <strong>CodeLens:</strong>
+                  <p>{answer}</p>
+                </div>
+              )}
             </div>
 
             <div>

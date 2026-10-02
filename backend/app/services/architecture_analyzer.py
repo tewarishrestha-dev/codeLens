@@ -1,4 +1,4 @@
-
+from pathlib import Path
 def build_architecture_summary(
     code_analysis,
     dependencies,
@@ -33,14 +33,29 @@ def build_architecture_summary(
                 "to": target,
             })
 
+            
+    directories = {}
+
+    for file in files:
+        parts = Path(file).parts
+
+        if len(parts) > 1:
+            directory = str(Path(*parts[:-1]))
+        else:
+            directory = "root"
+
+        directories.setdefault(directory, []).append(file)
+
     return {
-        "files": files,
-        "file_count": len(files),
-        "functions": functions,
-        "function_count": len(functions),
-        "classes": classes,
-        "class_count": len(classes),
-        "entry_points": entry_points,
-        "dependencies": dependency_edges,
-        "dependency_count": len(dependency_edges),
-    }
+    "files": files,
+    "file_count": len(files),
+    "functions": functions,
+    "function_count": len(functions),
+    "classes": classes,
+    "class_count": len(classes),
+    "entry_points": entry_points,
+    "dependencies": dependency_edges,
+    "dependency_count": len(dependency_edges),
+    "directories": directories,
+    "directory_count": len(directories),
+}

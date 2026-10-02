@@ -11,6 +11,12 @@ from backend.app.services.repository_store import save_repository
 from backend.app.services.repository_store import get_repository
 from backend.app.services.repository_analyzer import analyze_repository
 from backend.app.services.call_analyzer import build_execution_flow
+from backend.app.services.code_search import search_code
+from backend.app.services.context_builder import (
+    build_context,
+    build_project_context
+)
+from backend.app.services.llm_service import ask_llm, summarize_project
 import tempfile
 
 app = FastAPI()
@@ -60,7 +66,9 @@ def analyze_github(request: GitHubRequest):
         "dependencies": analysis["dependencies"],
         "call_graph": analysis["call_graph"],
         "entry_points": analysis["entry_points"],
-        "architecture": analysis["architecture"]
+        "architecture": analysis["architecture"],
+        "directories": analysis["architecture"]["directories"],
+        
     }
 
 @app.post("/analyze/zip")
@@ -96,6 +104,7 @@ def analyze_zip(file: UploadFile = File(...)):
         "call_graph": analysis["call_graph"],
         "entry_points": analysis["entry_points"],
         "architecture": analysis["architecture"],
+        "directories": analysis["architecture"]["directories"],
     }
 
 @app.get("/file")
@@ -186,3 +195,139 @@ def get_execution_flow(repository_id: str, entry_point: str):
     "entry_point": entry_point,
     "steps": flow
 }
+
+@app.get("/repository/{repository_id}/flow")
+def get_execution_flow(repository_id: str, entry_point: str):
+    repository = get_repository(repository_id)
+
+    if repository is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found"
+        )
+
+    flow = build_execution_flow(
+        repository["call_graph"],
+        entry_point
+    )
+
+    return {
+        "entry_point": entry_point,
+        "steps": flow
+    }
+
+
+@app.get("/repository/{repository_id}/search")
+def search_repository(
+    repository_id: str,
+    query: str
+):
+    repository = get_repository(repository_id)
+
+    if repository is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found"
+        )
+
+    if not query.strip():
+        return {"results": []}
+
+    results = search_code(
+        repository["code_analysis"],
+        query
+    )
+
+    return {
+        "query": query,
+        "results": results
+    }
+
+@app.get("/repository/{repository_id}/context")
+def get_context(
+    repository_id: str,
+    query: str
+):
+    repository = get_repository(repository_id)
+
+    if repository is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found"
+        )
+
+    if not query.strip():
+        return {"context": []}
+
+    search_results = search_code(
+        repository["code_analysis"],
+        query
+    )
+
+    context = build_context(
+    repository["path"],
+    repository["code_analysis"],
+    search_results,
+    repository["call_graph"]
+    )
+    return {
+        "query": query,
+        "context": context
+    }
+
+@app.get("/repository/{repository_id}/ask")
+def ask_codebase(
+    repository_id: str,
+    question: str
+):
+    repository = get_repository(repository_id)
+
+    if repository is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found"
+        )
+
+    if not question.strip():
+        return {"answer": ""}
+
+    search_results = search_code(
+        repository["code_analysis"],
+        question
+    )
+
+    context = build_context(
+    repository["path"],
+    repository["code_analysis"],
+    search_results,
+    repository["call_graph"]
+    )
+
+    answer = ask_llm(
+        question,
+        context
+    )
+
+    return {
+        "question": question,
+        "answer": answer,
+        "context": context
+    }
+
+@app.get("/repository/{repository_id}/summary")
+def summarize_codebase(repository_id: str):
+    repository = get_repository(repository_id)
+
+    if repository is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found"
+        )
+
+    project_context = build_project_context(repository)
+
+    summary = summarize_project(project_context)
+
+    return {
+        "summary": summary
+    }
