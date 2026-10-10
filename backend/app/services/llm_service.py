@@ -17,12 +17,17 @@ def ask_llm(question, context):
                 f"Source:\n{code['source']}"
             )
 
-    prompt = f"""You are CodeLens, an AI codebase tutor.
+    prompt = f"""You are CodeLens, a precise codebase analyst.
 
-Explain the code clearly and accurately using only the provided code context.
+Answer using only the supplied code context.
 
-Do not guess or invent functionality.
-If the provided context is insufficient, say so.
+Rules:
+- Never invent function calls, method calls, variables, or code behavior.
+- Do not assume one method calls another unless the source explicitly shows that call.
+- For numerical questions, trace the actual expressions and calculate the result step by step.
+- Distinguish facts from assumptions.
+- If the required source is missing, say so.
+- Explain the actual code, not what similar code might normally do.
 
 Code context:
 {"\n\n".join(code_context)}
@@ -30,7 +35,7 @@ Code context:
 Question:
 {question}
 
-Give a concise explanation. Mention relevant files and functions when useful.
+Give a concise, accurate answer. For calculations, show the relevant expression and final result.
 """
 
     response = requests.post(
@@ -54,6 +59,8 @@ def summarize_project(project_context):
 Analyze the project ONLY from the information provided below.
 
 Rules:
+- Do not invent line numbers or code details that are not provided.
+- Use the source code to determine what functions actually do.
 - Do not guess or invent functionality.
 - If the information is insufficient, explicitly say so.
 - Do not assume that a function named "train" means machine learning.

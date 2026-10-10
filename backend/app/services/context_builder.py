@@ -120,7 +120,33 @@ def build_context(
                         visited
                     )
                 )
+            elif match["type"] == "method":
+                class_info = next(
+                    (
+                        cls for cls in data.get("classes", [])
+                        if cls["name"] == match["class"]
+                    ),
+                    None
+                )
 
+                if class_info:
+                    source = read_file(Path(repo_path), file_path)
+                    lines = source.splitlines()
+                    start = class_info["line"] - 1
+                    end = len(lines)
+
+                    for i in range(start + 1, len(lines)):
+                        if lines[i] and not lines[i].startswith((" ", "\t")):
+                            end = i
+                            break
+
+                    relevant_code.append({
+                        "name": class_info["name"],
+                        "type": "class",
+                        "file": file_path,
+                        "line": class_info["line"],
+                        "source": "\n".join(lines[start:end])
+                    })
             elif match["type"] == "class":
                 source = read_file(
                     Path(repo_path),

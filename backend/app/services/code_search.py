@@ -34,6 +34,15 @@ def search_code(code_analysis, query):
                         "line": cls["line"]
                     })
 
+                for method in cls.get("methods", []):
+                    if keyword in method["name"].lower():
+                        matches.append({
+                            "type": "method",
+                            "name": method["name"],
+                            "line": method["line"],
+                            "class": cls["name"]
+                    })
+
             for imported in data.get("imports", []):
                 if keyword in imported.lower():
                     matches.append({
