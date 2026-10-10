@@ -17,7 +17,9 @@ def clone_repository(url: str):
 
     response.raise_for_status()
 
-    temp_dir = Path(tempfile.mkdtemp(dir="E:/CodeLensData"))
+    storage_dir = Path("E:/CodeLensData")
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    temp_dir = Path(tempfile.mkdtemp(dir=str(storage_dir)))
     zip_path = temp_dir / "repo.zip"
 
     zip_path.write_bytes(response.content)

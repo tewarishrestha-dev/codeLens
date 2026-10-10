@@ -74,7 +74,9 @@ def analyze_github(request: GitHubRequest):
 @app.post("/analyze/zip")
 def analyze_zip(file: UploadFile = File(...)):
     repo_name = Path(file.filename).stem
-    temp_file = Path("E:/CodeLensData") / f"{repo_name}.zip"
+    temp_dir = Path("E:/CodeLensData")
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    temp_file = temp_dir / f"{repo_name}.zip"
 
     temp_file.write_bytes(file.file.read())
 
@@ -175,26 +177,6 @@ def get_call_graph(repository_id: str):
         "repository_id": repository_id,
         "call_graph": repository["call_graph"]
     }
-
-@app.get("/repository/{repository_id}/flow")
-def get_execution_flow(repository_id: str, entry_point: str):
-    repository = get_repository(repository_id)
-
-    if repository is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Repository not found"
-        )
-
-    flow = build_execution_flow(
-        repository["call_graph"],
-        entry_point
-    )
-
-    return {
-    "entry_point": entry_point,
-    "steps": flow
-}
 
 @app.get("/repository/{repository_id}/flow")
 def get_execution_flow(repository_id: str, entry_point: str):

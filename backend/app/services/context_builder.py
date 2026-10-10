@@ -109,19 +109,40 @@ def build_context(
         visited = set()
 
         for match in result["matches"]:
-            if match["type"] != "function":
-                continue
-
-            relevant_code.extend(
-                get_function(
-                    repo_path,
-                    code_analysis,
-                    call_graph,
-                    file_path,
-                    match["name"],
-                    visited
+            if match["type"] == "function":
+                relevant_code.extend(
+                    get_function(
+                        repo_path,
+                        code_analysis,
+                        call_graph,
+                        file_path,
+                        match["name"],
+                        visited
+                    )
                 )
-            )
+
+            elif match["type"] == "class":
+                source = read_file(
+                    Path(repo_path),
+                    file_path
+                )
+
+                lines = source.splitlines()
+                start = match["line"] - 1
+                end = len(lines)
+
+                for i in range(start + 1, len(lines)):
+                    if lines[i] and not lines[i].startswith((" ", "\t")):
+                        end = i
+                        break
+
+                relevant_code.append({
+                    "name": match["name"],
+                    "type": "class",
+                    "file": file_path,
+                    "line": match["line"],
+                    "source": "\n".join(lines[start:end])
+                })
 
         context.append({
             "file": file_path,
