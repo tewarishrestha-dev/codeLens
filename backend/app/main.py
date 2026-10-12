@@ -240,10 +240,19 @@ def get_context(
 
     if not query.strip():
         return {"context": []}
+    
+    print("FILES ANALYZED:", len(repository["code_analysis"]))
+    print("RUN_COMMAND MATCHES:", [
+        (path, f["name"], f["line"])
+        for path, data in repository["code_analysis"].items()
+        for f in data.get("functions", [])
+        if "run_command" in f["name"].lower()
+    ])
 
     search_results = search_code(
         repository["code_analysis"],
-        query
+        query,
+        repository["path"]
     )
 
     context = build_context(
@@ -275,7 +284,8 @@ def ask_codebase(
 
     search_results = search_code(
         repository["code_analysis"],
-        question
+        question,
+        repository["path"]
     )
 
     context = build_context(

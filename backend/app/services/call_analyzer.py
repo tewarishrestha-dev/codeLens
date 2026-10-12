@@ -48,7 +48,12 @@ def build_call_graph(code_analysis):
                     targets[0]["line"]
                     if len(targets) == 1
                     else [target["line"] for target in targets]
-                )
+                ),
+                "targets": [
+                    {"file": target["file"], "line": target["line"]}
+                    for target in targets
+                ],
+                "ambiguous": len(targets) > 1,
             }
 
             graph[file_path].setdefault(
@@ -57,6 +62,39 @@ def build_call_graph(code_analysis):
             ).append(call_data)
 
     return graph
+
+
+def resolve_call_targets(call):
+    """Return every candidate (file_path, line) target for a call edge.
+
+    Ambiguous calls (a name defined in more than one place) return all
+    candidates instead of being filtered out by the consumer. Falls back to
+    the legacy ``target_file``/``target_line`` shape when ``targets`` is
+    absent.
+    """
+    targets = call.get("targets")
+
+    if targets:
+        return [
+            (target["file"], target.get("line"))
+            for target in targets
+        ]
+
+    target_file = call.get("target_file")
+    target_line = call.get("target_line")
+
+    if isinstance(target_file, str):
+        return [(target_file, target_line)]
+
+    if isinstance(target_file, list):
+        lines = (
+            target_line
+            if isinstance(target_line, list)
+            else [None] * len(target_file)
+        )
+        return list(zip(target_file, lines))
+
+    return []
 
 
 def build_execution_flow(call_graph, entry_point):
@@ -83,16 +121,15 @@ def build_execution_flow(call_graph, entry_point):
             return
 
         for call in functions.get(function_name, []):
-            target_file = call["target_file"]
+            for target_file, target_line in resolve_call_targets(call):
+                if not isinstance(target_file, str):
+                    continue
 
-            if not isinstance(target_file, str):
-                continue
-
-            walk(
-                target_file,
-                call["calls"],
-                call.get("target_line")
-            )
+                walk(
+                    target_file,
+                    call["calls"],
+                    target_line
+                )
 
     # Find functions that are never called by another function.
     called_functions = set()
