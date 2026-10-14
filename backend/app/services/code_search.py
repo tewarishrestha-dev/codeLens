@@ -33,6 +33,23 @@ HEADER_LINES = 5
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _PATH_RE = re.compile(r"[A-Za-z0-9_./\\-]+")
 
+# Test/fixture files are keyword-rich (they mention ``command``, ``invoke``,
+# ``execution`` constantly) and would otherwise crowd the real implementation
+# out of the limited context window, starving the model of the evidence it
+# needs. They are still returned, but ranked below non-test matches.
+_TEST_PATH_RE = re.compile(
+    r"(^|/)(tests?|testing|specs?|__tests__|fixtures?|mocks?|stubs?)/"
+    r"|(^|/)(test_[^/]*|[^/]*_test|[^/]*_spec)\.py$"
+    r"|\.test\.[^/]+$"
+    r"|\.spec\.[^/]+$"
+    r"|(^|/)conftest\.py$"
+)
+
+
+def _is_test_file(file_path):
+    normalized = file_path.replace("\\", "/").lower()
+    return _TEST_PATH_RE.search(normalized) is not None
+
 
 def _keywords(query):
     tokens = _WORD_RE.findall(query.lower())
@@ -197,6 +214,159 @@ def _name_matches(data, keywords):
     return matches
 
 
+def _named_classes(code_analysis, keywords, named_paths=None):
+    """Class identities the query clearly identifies (same rule as name matches).
+
+    Identities are ``(file path, class name)`` pairs so same-named classes in
+    different modules stay distinct. When the query names specific files, only
+    classes in those files are considered, so a path-qualified query cannot
+    activate hierarchy expansion in an unrelated module. Only these classes
+    (and their subclasses) activate inheritance expansion, so a generic query
+    that names no class never expands the hierarchy.
+    """
+    named = set()
+
+    for file_path, data in code_analysis.items():
+        if named_paths and not _is_named_file(named_paths, file_path):
+            continue
+
+        for cls in data.get("classes", []):
+            name = cls.get("name", "")
+
+            if any(_contains_word(name.lower(), keyword) for keyword in keywords):
+                named.add((file_path, name))
+
+    return named
+
+
+def _class_bases(code_analysis):
+    """Map each class identity to its resolved direct base identities.
+
+    Identities are ``(file path, class name)`` pairs. Bases come from the
+    parser's ``bases`` field (simple names; qualified bases such as
+    ``cli.Command`` are recorded as ``Command``). A base name is resolved
+    within the same module when that module defines it, otherwise to a unique
+    same-named class elsewhere in the repository; ambiguous or unknown bases
+    are dropped so unrelated same-named classes never link.
+    """
+    local_names = {}
+    owners = {}
+
+    for file_path, data in code_analysis.items():
+        defined = set()
+
+        for cls in data.get("classes", []):
+            name = cls.get("name")
+
+            if not name:
+                continue
+
+            defined.add(name)
+            owners.setdefault(name, set()).add(file_path)
+
+        local_names[file_path] = defined
+
+    bases = {}
+
+    for file_path, data in code_analysis.items():
+        for cls in data.get("classes", []):
+            name = cls.get("name")
+
+            if not name:
+                continue
+
+            direct = bases.setdefault((file_path, name), [])
+
+            for base in cls.get("bases", []):
+                if not base:
+                    continue
+
+                base_name = base.split(".")[-1]
+
+                if not base_name or base_name == name:
+                    continue
+
+                if base_name in local_names[file_path]:
+                    resolved = (file_path, base_name)
+                else:
+                    candidates = owners.get(base_name, set())
+
+                    if len(candidates) != 1:
+                        continue
+
+                    resolved = (next(iter(candidates)), base_name)
+
+                if resolved not in direct:
+                    direct.append(resolved)
+
+    return bases
+
+
+def _related_classes(named_classes, class_bases):
+    """Named class identities plus all transitive subclasses (cycle-safe)."""
+    if not named_classes:
+        return set()
+
+    children = {}
+
+    for name, direct_bases in class_bases.items():
+        for base in direct_bases:
+            children.setdefault(base, set()).add(name)
+
+    related = set()
+    queue = list(named_classes)
+
+    while queue:
+        current = queue.pop()
+
+        if current in related:
+            continue
+
+        related.add(current)
+
+        for child in children.get(current, ()):
+            if child not in related:
+                queue.append(child)
+
+    return related
+
+
+def _inherited_matches(file_path, data, related, canonical, existing):
+    """Methods of a named class identity or its subclasses not already surfaced.
+
+    These are added so a subclass method such as ``Group.invoke`` appears even
+    when its body has no query-keyword evidence. Existing matches are never
+    duplicated.
+    """
+    present = {(match.get("class"), match["name"]) for match in existing}
+    matches = []
+
+    for cls in data.get("classes", []):
+        class_name = cls.get("name")
+
+        if (file_path, class_name) not in related:
+            continue
+
+        for method in cls.get("methods", []):
+            key = (class_name, method["name"])
+
+            if key in present:
+                continue
+
+            present.add(key)
+
+            matches.append({
+                "type": "method",
+                "name": method["name"],
+                "line": canonical.get(key, method.get("line")),
+                "class": class_name,
+                "reason": "inherited",
+                "relevance": NAME_RELEVANCE - 1
+            })
+
+    return matches
+
+
 def _body_matches(repo_path, file_path, data, keywords, canonical):
     if repo_path is None:
         return []
@@ -307,33 +477,41 @@ def search_code(code_analysis, query, repo_path=None):
         return []
 
     named_paths = _named_paths(query)
+
+    # Inheritance expansion is only active when the query clearly names a
+    # class; methods of that class and its transitive subclasses then become
+    # first-class evidence (e.g. Group.invoke for a "Command" query).
+    related = _related_classes(
+        _named_classes(code_analysis, keywords, named_paths),
+        _class_bases(code_analysis)
+    )
+
     results = []
 
     for file_path, data in code_analysis.items():
         canonical = _canonical_lines(_definitions(data))
 
-        matches = _canonicalize(
-            _name_matches(data, keywords)
-            + _body_matches(repo_path, file_path, data, keywords, canonical),
-            canonical
+        matches = _name_matches(data, keywords)
+        matches += _body_matches(
+            repo_path, file_path, data, keywords, canonical
         )
 
+        if related:
+            matches += _inherited_matches(
+                file_path, data, related, canonical, matches
+            )
+
+        matches = _canonicalize(matches, canonical)
         matches = _dedupe(matches)
 
         if not matches:
             continue
 
-        # A class named in the query makes its own methods first-class
-        # evidence, so promote them above unrelated body-text matches.
-        named_classes = {
-            match["name"]
-            for match in matches
-            if match.get("type") == "class" and match.get("reason") == "name"
-        }
-
-        if named_classes:
+        # Methods belonging to a named class or one of its subclasses outrank
+        # unrelated body-text matches (but not the explicitly named class).
+        if related:
             for match in matches:
-                if match.get("class") in named_classes:
+                if (file_path, match.get("class")) in related:
                     match["relevance"] = max(
                         match.get("relevance", 0),
                         NAME_RELEVANCE - 1
@@ -341,17 +519,32 @@ def search_code(code_analysis, query, repo_path=None):
 
         matches.sort(key=_match_sort_key)
 
-        score = sum(_weight(match) for match in matches)
+        # Inherited matches guarantee inclusion but must not inflate the
+        # file-level ranking score.
+        score = sum(
+            _weight(match)
+            for match in matches
+            if match.get("reason") != "inherited"
+        )
 
         results.append({
             "file": file_path,
             "matches": matches,
             "score": score,
-            "named": _is_named_file(named_paths, file_path)
+            "named": _is_named_file(named_paths, file_path),
+            "test": _is_test_file(file_path),
         })
 
+    # Explicitly-named paths always win. Otherwise rank by score, but keep
+    # test files below real source so keyword-rich tests cannot crowd the
+    # implementation out of the context window.
     results.sort(
-        key=lambda item: (not item["named"], -item["score"], item["file"])
+        key=lambda item: (
+            not item["named"],
+            item["test"],
+            -item["score"],
+            item["file"],
+        )
     )
 
     return results

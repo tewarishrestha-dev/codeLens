@@ -1,9 +1,41 @@
 import ast
 from pathlib import Path
 
+
+def _base_name(node):
+    """Best-effort simple name of a base-class expression.
+
+    Handles ``Name`` (``Base``), ``Attribute`` (``module.Base`` -> ``Base``) and
+    ``Subscript`` (``Generic[T]`` -> ``Generic``). Anything else is ignored, so
+    dynamic or otherwise unsupported bases degrade gracefully.
+    """
+    if isinstance(node, ast.Name):
+        return node.id
+
+    if isinstance(node, ast.Attribute):
+        return node.attr
+
+    if isinstance(node, ast.Subscript):
+        return _base_name(node.value)
+
+    return None
+
+
+def _base_names(bases):
+    names = []
+
+    for base in bases:
+        name = _base_name(base)
+
+        if name and name not in names:
+            names.append(name)
+
+    return names
+
+
 def parse_python_file(file_path: Path):
     try:
-        source = file_path.read_text(encoding="utf-8")
+        source = file_path.read_text(encoding="utf-8-sig")
     except UnicodeDecodeError:
         return {
             "imports": [],
@@ -65,7 +97,8 @@ def parse_python_file(file_path: Path):
             classes.append({
                 "name": node.name,
                 "line": node.lineno,
-                "methods": methods
+                "methods": methods,
+                "bases": _base_names(node.bases)
             })
 
     return {

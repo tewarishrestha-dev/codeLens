@@ -216,7 +216,7 @@ class AnswerGroundingTest(unittest.TestCase):
         self.assertIn("[a.py:2]", answer)
         self.assertIn("a.py:99", answer)
         self.assertIn("unverified", answer.lower())
-        self.assertIn("Note:", answer)
+        self.assertIn("not part of the answer", answer.lower())
 
     def test_citation_note_does_not_claim_semantic_validation(self):
         context = [{
@@ -229,9 +229,353 @@ class AnswerGroundingTest(unittest.TestCase):
         answer = validate_citations("Only [a.py:7].", context)
 
         lowered = answer.lower()
-        self.assertIn("not found in the retrieved source", lowered)
+        self.assertIn("does not support a confident answer", lowered)
         self.assertNotIn("source supports", lowered)
-        self.assertNotIn("does not support the claim", lowered)
+        self.assertNotIn("verified by semantic", lowered)
+
+    def test_invented_behavior_citing_real_line_is_flagged(self):
+        """A claim naming an identifier absent from its cited line is flagged."""
+        context = [{
+            "file": "a.py",
+            "code": [{
+                "name": "helper",
+                "line": 5,
+                "source": "5: def helper():\n6:     return 1",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        # The cited line (a.py:5) is retrieved and real, but it defines
+        # `helper`, not `process_commands`. The claim invents behavior about
+        # process_commands and must be flagged as unsupported.
+        answer = validate_citations(
+            "process_commands executes command definitions sequentially "
+            "and handles errors [a.py:5].",
+            context,
+        )
+
+        lowered = answer.lower()
+        self.assertIn("not established by the retrieved source", lowered)
+        self.assertIn("a.py:5", answer)
+
+    def test_supported_claim_citing_containing_line_is_not_flagged(self):
+        """A claim whose identifier appears on the cited line passes."""
+        context = [{
+            "file": "a.py",
+            "code": [{
+                "name": "process_commands",
+                "line": 10,
+                "source": (
+                    "10: def process_commands(processors):\n"
+                    "11:     for p in processors:\n"
+                    "12:         p()"
+                ),
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "process_commands iterates the processors and calls each one "
+            "[a.py:11].",
+            context,
+        )
+
+        lowered = answer.lower()
+        self.assertNotIn("not established by the retrieved source", lowered)
+        self.assertIn("process_commands iterates", answer)
+
+    def test_citation_path_words_are_not_treated_as_identifiers(self):
+        """A filename inside [path:line] is not a claim identifier.
+
+        Strips citation spans before the support check so a grounded claim
+        like "defined on line [calculator.py:1]" is not flagged merely
+        because the cited file's own name is absent from the snippet.
+        """
+        context = [{
+            "file": "calculator.py",
+            "code": [{
+                "name": "add",
+                "line": 1,
+                "source": "1: def add(a, b):\n2:     return a + b",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "It is defined on line [calculator.py:1].",
+            context,
+        )
+
+        lowered = answer.lower()
+        self.assertNotIn("not established by the retrieved source", lowered)
+        self.assertIn("defined on line", answer)
+
+    def test_generic_prose_without_identifiers_is_not_flagged(self):
+        """Claims with no distinctive identifiers are left alone."""
+        context = [{
+            "file": "a.py",
+            "code": [{"name": "f", "line": 1, "source": "1: def f():\n2:     return 1"}],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "This function returns the value [a.py:2].",
+            context,
+        )
+
+        lowered = answer.lower()
+        self.assertNotIn("does not contain the identifiers", lowered)
+
+    def test_valid_citation_still_preserved_after_semantic_check(self):
+        """The new spot-check must not disturb valid citations."""
+        context = [{
+            "file": "a.py",
+            "code": [{
+                "name": "process_commands",
+                "line": 10,
+                "source": "10: def process_commands(processors):\n11:     return processors",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations("See [a.py:10].", context)
+        self.assertIn("[a.py:10]", answer)
+        self.assertNotIn("unverified", answer.lower())
+        self.assertNotIn("may overstate", answer.lower())
+
+    def test_suffix_path_citation_is_accepted(self):
+        """A repo-relative suffix citation resolves to a retrieved file."""
+        context = [{
+            "file": "src/click/core.py",
+            "code": [{
+                "name": "invoke",
+                "line": 100,
+                "source": "100:     def invoke(self, ctx):\n101:         return ctx",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        for cited in ["click/core.py", "core.py", "src/click/core.py"]:
+            answer = validate_citations(f"See [{cited}:101].", context)
+            self.assertNotIn(
+                "unverified", answer.lower(),
+                msg=f"citation {cited} should resolve to src/click/core.py",
+            )
+
+    def test_fabricated_path_citation_is_flagged(self):
+        """A citation naming a file that was not retrieved stays unverified."""
+        context = [{
+            "file": "src/click/core.py",
+            "code": [{
+                "name": "invoke",
+                "line": 100,
+                "source": "100:     def invoke(self, ctx):\n101:         return ctx",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations("See [click/arguments.py:696].", context)
+        self.assertIn("unverified", answer.lower())
+        self.assertIn("not part of the answer", answer.lower())
+
+    def test_symbol_citation_resolves_to_real_file(self):
+        """A ``func:line`` citation is rewritten to the retrieved file."""
+        context = [{
+            "file": "src/click/types.py",
+            "code": [{
+                "name": "launch",
+                "line": 923,
+                "source": "923: def launch(url):\n924:     return url",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "Click can launch a URL [launch:923].",
+            context,
+        )
+
+        self.assertIn("src/click/types.py:923", answer)
+        self.assertNotIn("unverified", answer.lower())
+
+    def test_extensionless_path_citation_is_accepted(self):
+        """A citation that drops the file extension still resolves."""
+        context = [{
+            "file": "src/click/core.py",
+            "code": [{
+                "name": "invoke",
+                "line": 100,
+                "source": "100:     def invoke(self, ctx):\n101:         return ctx",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations("See [click/core:100].", context)
+        self.assertNotIn("unverified", answer.lower())
+
+    def test_prompt_requires_verbatim_file_path_citations(self):
+        """Prompt must forbid inventing/shortening citation file paths."""
+        context = [{
+            "file": "src/click/core.py",
+            "code": [{
+                "name": "invoke",
+                "line": 100,
+                "source": "100:     def invoke(self, ctx):\n101:         return ctx",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        prompt = build_prompt("Where is invoke?", context)
+        self.assertIn("copied verbatim", prompt)
+        self.assertIn("File: src/click/core.py", prompt)
+
+    def test_mixed_answer_keeps_verified_and_qualifies_unsupported(self):
+        """Verified claims stay in the answer; unsupported ones are demoted."""
+        context = [{
+            "file": "a.py",
+            "code": [
+                {
+                    "name": "process_commands",
+                    "line": 10,
+                    "source": (
+                        "10: def process_commands(processors):\n"
+                        "11:     stream = ()\n"
+                        "12:     for p in processors:\n"
+                        "13:         stream = p(stream)"
+                    ),
+                },
+                {
+                    "name": "helper",
+                    "line": 50,
+                    "source": "50: def helper():\n51:     return 1",
+                },
+            ],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "process_commands builds a stream from the processors [a.py:12]. "
+            "It also handles command dispatch errors via retry logic "
+            "[bogus.py:99].",
+            context,
+        )
+
+        # The verified claim is presented as the answer body.
+        self.assertIn("process_commands builds a stream", answer)
+        self.assertIn("[a.py:12]", answer)
+
+        # The unverified claim is not asserted as fact; it is demoted.
+        self.assertIn("not part of the answer", answer.lower())
+        self.assertIn("handles command dispatch errors", answer)
+
+        # A marker distinguishes the two sections.
+        self.assertIn("not established by the retrieved source", answer.lower())
+        self.assertIn("supported by the retrieved code", answer.lower())
+
+    def test_all_unsupported_answer_says_no_confident_answer(self):
+        """When nothing verifies, the response must not assert the claims."""
+        context = [{
+            "file": "a.py",
+            "code": [{
+                "name": "helper",
+                "line": 5,
+                "source": "5: def helper():\n6:     return 1",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "process_commands executes command definitions sequentially "
+            "[a.py:5].",
+            context,
+        )
+
+        lowered = answer.lower()
+        self.assertIn("does not support a confident answer", lowered)
+        # The unsupported claim is still shown, but labelled.
+        self.assertIn("process_commands executes", answer)
+        self.assertIn("not part of the answer", lowered)
+
+    def test_unsupported_claim_not_presented_as_verified_answer(self):
+        """The unsupported claim must not appear before the demotion marker."""
+        context = [{
+            "file": "a.py",
+            "code": [{
+                "name": "helper",
+                "line": 5,
+                "source": "5: def helper():\n6:     return 1",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "process_commands executes command definitions sequentially "
+            "[a.py:5].",
+            context,
+        )
+
+        # The confident assertion must live only inside the flagged section,
+        # not in the leading answer body.
+        body, _, flagged = answer.partition("not part of the answer")
+        self.assertNotIn("process_commands executes", body.lower())
+        self.assertIn("process_commands executes", flagged.lower())
+
+    def test_uncited_claim_naming_absent_symbol_is_flagged(self):
+        """An uncited claim naming symbols absent from all context is demoted."""
+        context = [{
+            "file": "a.py",
+            "code": [{
+                "name": "helper",
+                "line": 5,
+                "source": "5: def helper():\n6:     return 1",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "The routine then calls retry_transient_errors to recover.",
+            context,
+        )
+
+        lowered = answer.lower()
+        self.assertIn("not part of the answer", lowered)
+        self.assertIn("retry_transient_errors", answer)
+
+    def test_uncited_claim_with_symbol_present_in_context_is_left(self):
+        """An uncited claim whose symbols are in context is not demoted."""
+        context = [{
+            "file": "a.py",
+            "code": [{
+                "name": "process_commands",
+                "line": 5,
+                "source": "5: def process_commands(processors):\n6:     return 1",
+            }],
+            "matches": [],
+            "imports": [],
+        }]
+
+        answer = validate_citations(
+            "The routine calls process_commands to recover.",
+            context,
+        )
+
+        lowered = answer.lower()
+        self.assertNotIn("not part of the answer", lowered)
+        self.assertIn("process_commands", answer)
 
 
 if __name__ == "__main__":

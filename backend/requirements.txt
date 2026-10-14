@@ -1,0 +1,9 @@
+# CodeLens backend runtime dependencies.
+# Install: pip install -r requirements.txt
+# Run from the project root (E:\CodeLens):
+#   uvicorn backend.app.main:app --reload
+
+fastapi>=0.110
+uvicorn[standard]>=0.27
+requests>=2.31
+python-multipart>=0.0.9

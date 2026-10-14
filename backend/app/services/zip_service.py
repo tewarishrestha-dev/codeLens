@@ -2,9 +2,11 @@ from pathlib import Path
 import tempfile
 import zipfile
 
+from .repository_store import data_dir
+
 
 def extract_zip(file_path: Path) -> Path:
-    storage_dir = Path("E:/CodeLensData")
+    storage_dir = data_dir()
     storage_dir.mkdir(parents=True, exist_ok=True)
     temp_dir = Path(tempfile.mkdtemp(dir=str(storage_dir)))
 

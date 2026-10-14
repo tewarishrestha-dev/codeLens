@@ -11,12 +11,13 @@ dist/
 
 # Local data
 CodeLensData/
+data/
 *.zip
+temp/
 
 # Editor
 .vscode/
 
-# Local data
-CodeLensData/
-*.zip
-temp/
+# Environment-specific files
+.env.*
+!.env.example

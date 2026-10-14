@@ -9,6 +9,6 @@ def read_file(repo_path: Path, relative_path: str):
         raise ValueError("File is outside repository")
 
     return file_path.read_text(
-        encoding="utf-8",
+        encoding="utf-8-sig",
         errors="replace"
     )

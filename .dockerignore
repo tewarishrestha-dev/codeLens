@@ -1,0 +1,39 @@
+# Root .dockerignore — applies to the backend build context (repository root).
+# Keep the backend image small and free of local data/secrets.
+
+.git
+.gitignore
+
+# Frontend is built separately.
+frontend/
+node_modules/
+
+# Local workspace data and archives — never bake into images.
+data/
+CodeLensData/
+E:/CodeLensData
+*.zip
+temp/
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Python caches and virtualenvs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Tests are not needed in the runtime image.
+backend/test_*.py
+test_*/
+test_project/
+
+# Docs and editor state
+*.md
+.vscode/
+.idea/

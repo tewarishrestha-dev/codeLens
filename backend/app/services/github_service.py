@@ -3,6 +3,8 @@ from pathlib import Path
 import tempfile
 import zipfile
 
+from .repository_store import data_dir
+
 
 def clone_repository(url: str):
     repo_name = url.rstrip("/").split("/")[-1].replace(".git", "")
@@ -17,7 +19,7 @@ def clone_repository(url: str):
 
     response.raise_for_status()
 
-    storage_dir = Path("E:/CodeLensData")
+    storage_dir = data_dir()
     storage_dir.mkdir(parents=True, exist_ok=True)
     temp_dir = Path(tempfile.mkdtemp(dir=str(storage_dir)))
     zip_path = temp_dir / "repo.zip"

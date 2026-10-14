@@ -1,0 +1,7 @@
+# Frontend build-context ignore (context: ./frontend).
+node_modules/
+dist/
+.env
+.env.*
+*.log
+.DS_Store

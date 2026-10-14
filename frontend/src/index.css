@@ -1,129 +1,192 @@
+/* CodeLens base — "Instrument" identity, Stage 1.
+   Deep navy ink, electric blue/violet signal, restrained cyan.
+   Display: Space Grotesk. Body: Inter. Mono stays system. */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Surfaces — dark (default) */
+  --ink: #0b1020;
+  --ink-2: #10162a;
+  --ink-3: #161e36;
+  --line: rgba(148, 163, 204, 0.14);
+  --line-strong: rgba(148, 163, 204, 0.3);
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Text */
+  --paper: #e8ecf8;
+  --paper-dim: #9aa6c4;
+  --paper-faint: #5c6884;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  /* Accents */
+  --signal: #5b8cff;
+  --signal-2: #8b5cf6;
+  --signal-3: #22d3ee;
+  --accent-magenta: #e879f9;
+  --accent-amber: #fbbf24;
+  --signal-wash: rgba(91, 140, 255, 0.12);
+  --signal-glow: rgba(91, 140, 255, 0.35);
+  --signal-border: rgba(91, 140, 255, 0.45);
+  --success: #34d399;
+  /* Soft multicolour washes for selected surfaces and interactions */
+  --grad-accent: linear-gradient(
+    135deg,
+    var(--signal) 0%,
+    var(--signal-2) 55%,
+    var(--signal-3) 120%
+  );
+  --grad-accent-soft: linear-gradient(
+    120deg,
+    rgba(91, 140, 255, 0.16) 0%,
+    rgba(139, 92, 246, 0.12) 45%,
+    rgba(34, 211, 238, 0.1) 100%
+  );
+
+  /* Elevation / interaction */
+  --hover-wash: rgba(148, 163, 204, 0.07);
+  --active-wash: rgba(91, 140, 255, 0.1);
+  --focus-ring: rgba(91, 140, 255, 0.65);
+
+  /* Typography */
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono",
+    ui-monospace, monospace;
+
+  color-scheme: dark;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* Light palette — designed surfaces, not inverted dark. */
+[data-theme="light"] {
+  --ink: #f3f5fb;
+  --ink-2: #ffffff;
+  --ink-3: #e8ecf6;
+  --line: rgba(30, 41, 78, 0.12);
+  --line-strong: rgba(30, 41, 78, 0.26);
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+  --paper: #141a2e;
+  --paper-dim: #4a5570;
+  --paper-faint: #8891aa;
+
+  --signal: #3b5bdb;
+  --signal-2: #6d4aff;
+  --signal-3: #0e9bb8;
+  --accent-magenta: #a21caf;
+  --accent-amber: #b45309;
+  --signal-wash: rgba(59, 91, 219, 0.1);
+  --signal-glow: rgba(59, 91, 219, 0.28);
+  --signal-border: rgba(59, 91, 219, 0.4);
+  --success: #0d9488;
+  --grad-accent: linear-gradient(
+    135deg,
+    var(--signal) 0%,
+    var(--signal-2) 55%,
+    var(--signal-3) 120%
+  );
+  --grad-accent-soft: linear-gradient(
+    120deg,
+    rgba(59, 91, 219, 0.1) 0%,
+    rgba(109, 74, 255, 0.08) 45%,
+    rgba(14, 155, 184, 0.08) 100%
+  );
+
+  --hover-wash: rgba(30, 41, 78, 0.05);
+  --active-wash: rgba(59, 91, 219, 0.08);
+  --focus-ring: rgba(59, 91, 219, 0.55);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background: var(--ink);
+  color: var(--paper);
 }
 
 #root {
-  width: 1126px;
+  width: 100%;
   max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+  margin: 0;
+  text-align: left;
+  display: block;
+}
+
+::selection {
+  background: var(--signal);
+  color: #fff;
+}
+
+[data-theme="light"] ::selection {
+  color: #fff;
+}
+
+/* Visible keyboard focus across the app. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+.file:focus-visible,
+.folder:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Precision scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 0;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--paper-faint);
 }
 
 h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  color: var(--paper);
+  font-family: var(--font-display);
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
 p {
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
 code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
-.file {
-  padding: 6px 6px 6px 24px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.folder {
-  padding: 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.file:hover,
-.folder:hover {
-  background: #292b35;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  padding: 1px 5px;
 }

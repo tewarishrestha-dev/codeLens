@@ -1,0 +1,51 @@
+# CodeLens — minimal Docker Compose (frontend + backend).
+#
+# Ollama stays OUTSIDE Docker. Point CODELENS_OLLAMA_BASE_URL at:
+#   - Docker Desktop:  http://host.docker.internal:11434  (default below)
+#   - Linux + remote:  http://<ollama-host>:11434
+#
+# Usage:
+#   cp .env.example .env   # optional; defaults work for local Docker Desktop
+#   docker compose up --build
+#
+# Frontend: http://localhost:8080
+# Backend:  http://localhost:8000  (health: /health)
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: codelens-backend:latest
+    ports:
+      - "${CODELENS_BACKEND_PORT:-8000}:8000"
+    environment:
+      CODELENS_DATA_DIR: /data/codelens
+      # Browser origin of the frontend as served to the user (not the container name).
+      CODELENS_CORS_ORIGINS: ${CODELENS_CORS_ORIGINS:-http://localhost:8080}
+      # Host Ollama via Docker Desktop alias; override for a remote endpoint.
+      CODELENS_OLLAMA_BASE_URL: ${CODELENS_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      CODELENS_OLLAMA_MODEL: ${CODELENS_OLLAMA_MODEL:-qwen2.5-coder:3b}
+    volumes:
+      # Persistent workspace store. Default: ./data on the host.
+      # To reuse existing Windows data, set CODELENS_HOST_DATA_DIR=E:/CodeLensData
+      # in .env (path must be accessible to the Docker daemon).
+      - ${CODELENS_HOST_DATA_DIR:-./data}:/data/codelens
+    extra_hosts:
+      # Allows host.docker.internal on Linux; Docker Desktop already provides it.
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Public URL the browser uses to reach the backend (host-mapped port).
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    image: codelens-frontend:latest
+    ports:
+      - "${CODELENS_FRONTEND_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

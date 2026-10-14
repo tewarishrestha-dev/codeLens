@@ -163,7 +163,7 @@ class SearchRetrievalTest(unittest.TestCase):
         repo_path = self.make_repo({
             "svc.py": (
                 "def process_commands(processors):\n"
-                "    \"\"\"Composes subcommands into a pipeline.\"\"\"\n"
+                '    """Composes subcommands into a pipeline."""\n'
                 "    return processors\n"
             ),
         })
@@ -171,6 +171,31 @@ class SearchRetrievalTest(unittest.TestCase):
 
         results = search_code(code_analysis, "commander", None)
         self.assertEqual(results, [])
+
+    def test_test_files_do_not_crowd_out_source(self):
+        """Keyword-rich test files rank below real source matches."""
+        repo_path = self.make_repo({
+            "src/core.py": CORE,
+            "tests/test_command_execution.py": (
+                "def test_command_execution():\n"
+                '    """Tests command execution flow."""\n'
+                "    run_command()\n"
+                "    handle_command()\n"
+            ),
+        })
+        code_analysis = parse_repository(repo_path)
+
+        results = search_code(code_analysis, QUERY, repo_path)
+        ranked = [normalize(result["file"]) for result in results]
+
+        # Real source outranks the keyword-rich test file even though the
+        # test file mentions the same query keywords.
+        self.assertIn("src/core.py", ranked)
+        self.assertIn("tests/test_command_execution.py", ranked)
+        self.assertLess(
+            ranked.index("src/core.py"),
+            ranked.index("tests/test_command_execution.py"),
+        )
 
 
 if __name__ == "__main__":
