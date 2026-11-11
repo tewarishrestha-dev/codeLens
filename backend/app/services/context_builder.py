@@ -35,6 +35,19 @@ def get_function_source(source, function):
     if start < 0 or start >= len(lines):
         return ""
 
+    # If the function uses braces (JavaScript, TypeScript, C, etc.), track brace depth
+    first_chunk = "".join(lines[start:min(start + 3, len(lines))])
+    if "{" in first_chunk:
+        depth = 0
+        started = False
+        for i in range(start, len(lines)):
+            line = lines[i]
+            depth += line.count("{") - line.count("}")
+            if "{" in line:
+                started = True
+            if started and depth <= 0:
+                return "\n".join(lines[start:i + 1])
+
     def_indent = _indentation(lines[start])
     end = len(lines)
 

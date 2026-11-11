@@ -21,4 +21,5 @@ RUN mkdir -p /data/codelens
 EXPOSE 8000
 
 # No --reload in production. Bind all interfaces so the container is reachable.
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Uses ${PORT:-8000} to automatically support Render, Railway, and local containers.
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

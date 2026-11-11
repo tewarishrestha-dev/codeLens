@@ -2,18 +2,26 @@ import { useState } from "react";
 import { computeStats } from "../repoUtils";
 import { API_URL, fetchJson } from "../api";
 
-// Command Center: analyze a repo (zip or GitHub), then jump into the
+const DEMO_REPOS = [
+  { name: "Pallets / Click", url: "https://github.com/pallets/click", badge: "Python" },
+  { name: "Express / Router", url: "https://github.com/pillarjs/router", badge: "JavaScript" },
+];
+
+// Command Center: analyze a repo (zip, GitHub, or Demo), then jump into the
 // workspace. Recent persisted projects are listed for quick reopening.
 export function HomePage({ onAnalyzed, onNavigate, aiStatus, repoList, onOpenRepo }) {
   const [file, setFile] = useState(null);
   const [githubUrl, setGithubUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState("");
   const [error, setError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
 
   async function analyzeZip() {
     if (!file) return;
 
     setLoading(true);
+    setLoadingStep("Uploading and parsing ZIP archive…");
     setError("");
     aiStatus("loading", "Analyzing your ZIP…");
 
@@ -34,21 +42,24 @@ export function HomePage({ onAnalyzed, onNavigate, aiStatus, repoList, onOpenRep
       aiStatus("error", "Analysis failed.");
     } finally {
       setLoading(false);
+      setLoadingStep("");
     }
   }
 
-  async function analyzeGithub() {
-    if (!githubUrl) return;
+  async function analyzeGithub(targetUrl) {
+    const urlToUse = targetUrl || githubUrl;
+    if (!urlToUse) return;
 
     setLoading(true);
+    setLoadingStep("Cloning repository and analyzing code graph…");
     setError("");
-    aiStatus("loading", "Cloning from GitHub…");
+    aiStatus("loading", `Analyzing ${urlToUse}…`);
 
     try {
       const data = await fetchJson(`${API_URL}/analyze/github`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: githubUrl }),
+        body: JSON.stringify({ url: urlToUse }),
       });
 
       onAnalyzed(data, computeStats(data));
@@ -59,6 +70,20 @@ export function HomePage({ onAnalyzed, onNavigate, aiStatus, repoList, onOpenRep
       aiStatus("error", "Analysis failed.");
     } finally {
       setLoading(false);
+      setLoadingStep("");
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const dropped = e.dataTransfer.files[0];
+      if (dropped.name.endsWith(".zip")) {
+        setFile(dropped);
+      } else {
+        setError("Please drop a valid .zip archive.");
+      }
     }
   }
 
@@ -66,24 +91,30 @@ export function HomePage({ onAnalyzed, onNavigate, aiStatus, repoList, onOpenRep
     <div className="page home-page">
       <div className="home-hero">
         <p className="hero-kicker">
-          <span className="kicker-index">01</span> Command Center — local analysis
+          <span className="kicker-index">01</span> Command Center — codebase intelligence
         </p>
         <h2 className="home-title">Take the code apart.</h2>
         <p className="home-subtitle">
           Point CodeLens at a repository. It maps the architecture, indexes
-          every function and class, and lets you interrogate the code with an
+          functions and classes across Python and JavaScript/TypeScript, and lets you interrogate the code with an
           evidence-grounded AI.
         </p>
       </div>
 
       <div className="home-cards">
-        <div className="home-card">
+        <div
+          className={`home-card ${isDragging ? "drag-active" : ""}`}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+        >
           <p className="entry-label">A — Upload</p>
           <h3>ZIP Archive</h3>
-          <p>Drop a <code>.zip</code> of any project. Parsed locally, nothing leaves your machine except the model call.</p>
+          <p>Drop a <code>.zip</code> of any project or browse your local filesystem.</p>
           <input
             type="file"
             accept=".zip"
+            id="zip-upload"
             onChange={(e) => setFile(e.target.files[0])}
           />
           <button onClick={analyzeZip} disabled={loading || !file}>
@@ -95,18 +126,48 @@ export function HomePage({ onAnalyzed, onNavigate, aiStatus, repoList, onOpenRep
         <div className="home-card">
           <p className="entry-label">B — Remote</p>
           <h3>GitHub URL</h3>
-          <p>Paste a public repo URL. CodeLens fetches the default branch archive.</p>
+          <p>Paste a public repository URL to fetch and map the codebase.</p>
           <input
             type="text"
             placeholder="https://github.com/user/repo"
             value={githubUrl}
             onChange={(e) => setGithubUrl(e.target.value)}
+            disabled={loading}
           />
-          <button onClick={analyzeGithub} disabled={loading || !githubUrl}>
+          <button onClick={() => analyzeGithub()} disabled={loading || !githubUrl}>
             {loading ? "Cloning…" : "Analyze GitHub"}
           </button>
         </div>
+
+        <div className="home-card demo-card">
+          <p className="entry-label">C — Quick Demo</p>
+          <h3>Try Sample Repos</h3>
+          <p>Instant 1-click exploration without needing to upload files.</p>
+          <div className="demo-buttons">
+            {DEMO_REPOS.map((demo) => (
+              <button
+                key={demo.name}
+                className="demo-button"
+                onClick={() => {
+                  setGithubUrl(demo.url);
+                  analyzeGithub(demo.url);
+                }}
+                disabled={loading}
+              >
+                <span>{demo.name}</span>
+                <span className="demo-badge">{demo.badge}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {loading && (
+        <div className="loading-banner">
+          <span className="spinner-dot" />
+          <span>{loadingStep || "Analyzing codebase… this takes a few seconds"}</span>
+        </div>
+      )}
 
       {error && <div className="error">{error}</div>}
 

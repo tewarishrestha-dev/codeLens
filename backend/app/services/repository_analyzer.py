@@ -11,6 +11,20 @@ ENTRY_POINTS = {
     "app.py",
     "server.py",
     "manage.py",
+    "index.js",
+    "index.ts",
+    "index.jsx",
+    "index.tsx",
+    "main.js",
+    "main.ts",
+    "main.jsx",
+    "main.tsx",
+    "server.js",
+    "server.ts",
+    "app.js",
+    "app.ts",
+    "App.jsx",
+    "App.tsx",
 }
 
 

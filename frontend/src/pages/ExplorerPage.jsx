@@ -7,7 +7,7 @@ import {
   DependencyGraph,
   ExecutionFlow,
 } from "../components/Graphs";
-import { getLanguage, stripRepoPrefix, toPosix } from "../repoUtils";
+import { getLanguage, stripRepoPrefix, toPosix, computeStats } from "../repoUtils";
 import { API_URL, fetchJson } from "../api";
 
 // Internal explorer views. Top-level navigation is unchanged — these are
@@ -50,6 +50,40 @@ export function ExplorerPage({ result, aiStatus, openRequest, onOpenRequestConsu
   const codeRef = useRef(null);
   const [targetLine, setTargetLine] = useState(null);
   const [highlightLine, setHighlightLine] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  function exportReport() {
+    if (!result) return;
+    const stats = computeStats(result);
+    const md = `# CodeLens Analysis Report: ${result.name}
+Generated: ${new Date().toLocaleString()}
+
+## Architecture Overview
+- Files Analyzed: ${stats.files}
+- Functions Indexed: ${stats.functions}
+- Classes: ${stats.classes}
+- Dependencies: ${stats.dependencies}
+- Python Files: ${stats.python}
+- JavaScript Files: ${stats.javascript}
+- TypeScript Files: ${stats.typescript}
+
+## Detected Entry Points
+${(result.entry_points || []).map((ep) => `- ${ep}`).join("\n") || "None detected"}
+
+## Top Modules
+${Object.entries(result.architecture?.directories || {})
+  .map(([dir, files]) => `- **${dir}/** (${files.length} files)`)
+  .join("\n")}
+`;
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${result.name || "codelens"}-analysis.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    aiStatus("success", "Analysis report downloaded.");
+  }
   // Large overlay viewer for the selected source file. Opened by openFile;
   // closed by the user without clearing selectedFile (analysis stays intact).
   // Opening from Graph Studio and closing returns to Graph Studio with the
@@ -395,6 +429,14 @@ export function ExplorerPage({ result, aiStatus, openRequest, onOpenRequestConsu
         >
           Graph Studio
         </button>
+        <button
+          type="button"
+          className="explorer-export-btn"
+          onClick={exportReport}
+          title="Export workspace analysis as Markdown"
+        >
+          ⬇ Export Report
+        </button>
       </div>
 
       <div
@@ -557,6 +599,11 @@ export function ExplorerPage({ result, aiStatus, openRequest, onOpenRequestConsu
               <button type="button" onClick={searchRepository}>
                 Search
               </button>
+              {searchResults.length > 0 && (
+                <span className="search-count-badge">
+                  {searchResults.reduce((acc, curr) => acc + (curr.matches?.length || 0), 0)} results
+                </span>
+              )}
             </div>
             {searchResults.length > 0 && (
               <div className="code-search-results">
@@ -599,7 +646,26 @@ export function ExplorerPage({ result, aiStatus, openRequest, onOpenRequestConsu
             </aside>
 
             <section className="panel code-panel">
-              <h3>{selectedFile || "Select a file"}</h3>
+              <div className="code-panel-header">
+                <h3>{selectedFile || "Select a file"}</h3>
+                {selectedFile && fileContent && (
+                  <div className="code-header-actions">
+                    <span className="code-lang-badge">{getLanguage(selectedFile)}</span>
+                    <button
+                      type="button"
+                      className="copy-code-btn"
+                      onClick={() => {
+                        navigator.clipboard.writeText(fileContent);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      title="Copy code to clipboard"
+                    >
+                      {copied ? "✓ Copied" : "Copy Code"}
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {selectedFile ? (
                 <div ref={codeRef}>

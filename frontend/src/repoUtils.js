@@ -48,26 +48,35 @@ export function getLanguage(filePath) {
 }
 
 export function computeStats(data) {
-  const files = Object.keys(data.code_analysis);
+  const files = Object.keys(data.code_analysis || {});
 
   const functionCount = files.reduce(
-    (total, file) => total + data.code_analysis[file].functions.length,
+    (total, file) => total + (data.code_analysis[file].functions?.length || 0),
     0
   );
 
   const classCount = files.reduce(
-    (total, file) => total + data.code_analysis[file].classes.length,
+    (total, file) => total + (data.code_analysis[file].classes?.length || 0),
     0
   );
 
-  const dependencyCount = Object.values(data.dependencies.forward).reduce(
+  const forwardDeps = data.dependencies?.forward || {};
+  const dependencyCount = Object.values(forwardDeps).reduce(
     (total, dependencies) => total + dependencies.length,
     0
   );
 
+  const pythonCount = files.filter((file) => file.endsWith(".py")).length;
+  const jsCount = files.filter((file) => /\.(js|jsx|mjs|cjs)$/.test(file)).length;
+  const tsCount = files.filter((file) => /\.(ts|tsx)$/.test(file)).length;
+  const otherCount = files.length - pythonCount - jsCount - tsCount;
+
   return {
     files: files.length,
-    python: files.filter((file) => file.endsWith(".py")).length,
+    python: pythonCount,
+    javascript: jsCount,
+    typescript: tsCount,
+    other: otherCount > 0 ? otherCount : 0,
     functions: functionCount,
     classes: classCount,
     dependencies: dependencyCount,

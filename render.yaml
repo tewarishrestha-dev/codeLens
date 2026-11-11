@@ -1,0 +1,43 @@
+# Render Blueprint Specification for CodeLens
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ==========================================
+  # 1. Backend Web Service (FastAPI)
+  # ==========================================
+  - type: web
+    name: codelens-backend
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: CODELENS_DATA_DIR
+        value: /tmp/codelens_data
+      - key: CODELENS_CORS_ORIGINS
+        value: "*"
+      # Add GEMINI_API_KEY or GROQ_API_KEY in the Render Dashboard for free Cloud AI answers
+
+  # ==========================================
+  # 2. Frontend Static Site (React + Vite)
+  # ==========================================
+  - type: web
+    name: codelens-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: codelens-backend
+          property: host
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

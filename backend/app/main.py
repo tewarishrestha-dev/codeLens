@@ -1,6 +1,6 @@
 from pathlib import Path
 import os
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.models.github import GitHubRequest
 from backend.app.models.repository import Repository
@@ -21,7 +21,7 @@ from backend.app.services.context_builder import (
     build_context,
     build_project_context
 )
-from backend.app.services.llm_service import ask_llm, summarize_project
+from backend.app.services.llm_service import ask_llm, summarize_project, get_llm_status
 import tempfile
 
 # CORS: comma-separated list of allowed frontend origins.
@@ -82,7 +82,29 @@ def home():
 
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "llm": get_llm_status()
+    }
+
+
+@app.get("/llm/status")
+def llm_status():
+    return get_llm_status()
+
+
+def _extract_llm_options(request: Request) -> dict:
+    options = {}
+    provider = request.headers.get("x-llm-provider")
+    if provider:
+        options["provider"] = provider
+    api_key = request.headers.get("x-api-key")
+    if api_key:
+        options["api_key"] = api_key
+    model = request.headers.get("x-llm-model")
+    if model:
+        options["model"] = model
+    return options
 
 
 @app.post("/analyze/github")
@@ -305,7 +327,8 @@ def get_context(
 @app.get("/repository/{repository_id}/ask")
 def ask_codebase(
     repository_id: str,
-    question: str
+    question: str,
+    request: Request
 ):
     repository = load_repository_or_404(repository_id)
 
@@ -319,15 +342,16 @@ def ask_codebase(
     )
 
     context = build_context(
-    repository["path"],
-    repository["code_analysis"],
-    search_results,
-    repository["call_graph"]
+        repository["path"],
+        repository["code_analysis"],
+        search_results,
+        repository["call_graph"]
     )
 
     answer = ask_llm(
         question,
-        context
+        context,
+        options=_extract_llm_options(request)
     )
 
     return {
@@ -336,13 +360,20 @@ def ask_codebase(
         "context": context
     }
 
+
 @app.get("/repository/{repository_id}/summary")
-def summarize_codebase(repository_id: str):
+def summarize_codebase(
+    repository_id: str,
+    request: Request
+):
     repository = load_repository_or_404(repository_id)
 
     project_context = build_project_context(repository)
 
-    summary = summarize_project(project_context)
+    summary = summarize_project(
+        project_context,
+        options=_extract_llm_options(request)
+    )
 
     return {
         "summary": summary
