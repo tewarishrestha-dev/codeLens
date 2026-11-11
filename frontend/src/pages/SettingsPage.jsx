@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
-import { API_URL, fetchJson, getStoredLlmConfig, saveStoredLlmConfig } from "../api";
+import {
+  API_URL,
+  fetchJson,
+  getStoredLlmConfig,
+  saveStoredLlmConfig,
+  getActiveApiUrl,
+  saveApiUrlOverride
+} from "../api";
 
 // Settings: backend health/model info, LLM cloud provider + display prefs.
 export function SettingsPage({ aiStatus }) {
   const [health, setHealth] = useState(null);
   const [error, setError] = useState("");
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [customApiUrl, setCustomApiUrl] = useState(getActiveApiUrl());
 
   const initialLlm = getStoredLlmConfig();
   const [provider, setProvider] = useState(initialLlm.provider || "default");
@@ -14,7 +22,7 @@ export function SettingsPage({ aiStatus }) {
   const [savedFeedback, setSavedFeedback] = useState("");
 
   useEffect(() => {
-    fetchJson(`${API_URL}/health`)
+    fetchJson(`${getActiveApiUrl()}/health`)
       .then(setHealth)
       .catch((err) => setError(err.message));
   }, []);
@@ -139,17 +147,52 @@ export function SettingsPage({ aiStatus }) {
       </div>
 
       <div className="settings-section">
-        <h3>Backend Health</h3>
+        <h3>Backend API Connection</h3>
         {error && <div className="error">{error}</div>}
+        <div className="form-group" style={{ maxWidth: "540px", marginTop: "10px" }}>
+          <label htmlFor="backend-url">Backend URL</label>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <input
+              id="backend-url"
+              type="text"
+              value={customApiUrl}
+              onChange={(e) => setCustomApiUrl(e.target.value)}
+              placeholder="https://your-backend.onrender.com"
+              className="settings-input"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => {
+                saveApiUrlOverride(customApiUrl);
+                setError("");
+                fetchJson(`${getActiveApiUrl()}/health`)
+                  .then((h) => {
+                    setHealth(h);
+                    setSavedFeedback("Backend connected successfully!");
+                    aiStatus("success", "Backend connected!");
+                    setTimeout(() => setSavedFeedback(""), 3000);
+                  })
+                  .catch((err) => {
+                    setError(`Failed to connect to ${customApiUrl}: ${err.message}`);
+                    aiStatus("error", "Connection failed.");
+                  });
+              }}
+            >
+              Test & Connect
+            </button>
+          </div>
+        </div>
         {health ? (
-          <ul className="settings-list">
+          <ul className="settings-list" style={{ marginTop: "14px" }}>
             <li>
               <span>Status</span>
               <span className="settings-value ok">{health.status}</span>
             </li>
             <li>
-              <span>API endpoint</span>
-              <span className="settings-value">{API_URL}</span>
+              <span>Active Endpoint</span>
+              <span className="settings-value">{getActiveApiUrl()}</span>
             </li>
             {health.llm && (
               <>
@@ -157,15 +200,11 @@ export function SettingsPage({ aiStatus }) {
                   <span>Active Server LLM</span>
                   <span className="settings-value">{health.llm.provider}</span>
                 </li>
-                <li>
-                  <span>Ollama Base URL</span>
-                  <span className="settings-value">{health.llm.ollama_base_url}</span>
-                </li>
               </>
             )}
           </ul>
         ) : (
-          !error && <p>Checking backend…</p>
+          !error && <p style={{ marginTop: "10px" }}>Checking backend connection…</p>
         )}
       </div>
 

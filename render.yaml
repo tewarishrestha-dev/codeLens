@@ -34,7 +34,7 @@ services:
         fromService:
           type: web
           name: codelens-backend
-          property: host
+          property: url
     routes:
       - type: rewrite
         source: /*
