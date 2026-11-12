@@ -6,6 +6,9 @@ import { AskPage } from "./pages/AskPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AiCompanion } from "./components/AiCompanion";
 import { Atmosphere } from "./components/Atmosphere";
+import { LandingPage } from "./components/LandingPage";
+import { AuthModal } from "./components/AuthModal";
+import { GlowingCursor } from "./components/GlowingCursor";
 import { addPaths, computeStats } from "./repoUtils";
 import { API_URL, fetchJson } from "./api";
 import "./App.css";
@@ -20,6 +23,7 @@ const PAGES = [
 
 const ACTIVE_REPO_KEY = "codelens.activeRepoId";
 const THEME_KEY = "codelens.theme";
+const USER_KEY = "codelens.user";
 
 function readStoredTheme() {
   try {
@@ -29,7 +33,20 @@ function readStoredTheme() {
   }
 }
 
+function readStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function App() {
+  const [user, setUser] = useState(readStoredUser);
+  const [inWorkspace, setInWorkspace] = useState(() => Boolean(readStoredUser()));
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
   const [page, setPage] = useState("home");
   // Full analysis payloads, keyed by repository_id. Populated when a
   // workspace is analyzed or opened (including reopen after a restart).
@@ -289,8 +306,32 @@ function App() {
     }
   }
 
+  if (!inWorkspace) {
+    return (
+      <div className="landing-wrapper">
+        <GlowingCursor />
+        <LandingPage
+          onEnterApp={() => setInWorkspace(true)}
+          onOpenAuth={() => setAuthModalOpen(true)}
+          user={user}
+        />
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          onAuthSuccess={(authedUser) => {
+            setUser(authedUser);
+            setAuthModalOpen(false);
+            setInWorkspace(true);
+            aiStatus("success", `Welcome, ${authedUser.name}!`);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
+      <GlowingCursor />
       <Atmosphere />
       <aside className="sidebar">
         <div className="sidebar-brand">
@@ -335,6 +376,34 @@ function App() {
           ) : (
             <div className="sidebar-active-repo muted">No repo loaded</div>
           )}
+
+          {user && (
+            <div className="sidebar-user-badge">
+              <div className="user-avatar">{user.name.charAt(0).toUpperCase()}</div>
+              <div className="user-details">
+                <span className="user-name">{user.name}</span>
+                <button
+                  type="button"
+                  className="user-signout-btn"
+                  onClick={() => {
+                    localStorage.removeItem(USER_KEY);
+                    setUser(null);
+                    setInWorkspace(false);
+                  }}
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="landing-back-btn"
+            onClick={() => setInWorkspace(false)}
+          >
+            ← Front Page
+          </button>
         </div>
       </aside>
 

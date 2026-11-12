@@ -3,50 +3,55 @@
    Display: Space Grotesk. Body: Inter. Mono stays system. */
 
 :root {
-  /* Surfaces — dark (default) */
-  --ink: #0b1020;
-  --ink-2: #10162a;
-  --ink-3: #161e36;
-  --line: rgba(148, 163, 204, 0.14);
-  --line-strong: rgba(148, 163, 204, 0.3);
+  /* Surfaces — deep obsidian black aesthetic (AW Media inspired) */
+  --ink: #000000;
+  --ink-2: #050507;
+  --ink-3: #0a0a0f;
+  --glass-surface: rgba(255, 255, 255, 0.03);
+  --glass-surface-hover: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.22);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.2);
 
   /* Text */
-  --paper: #e8ecf8;
-  --paper-dim: #9aa6c4;
-  --paper-faint: #5c6884;
+  --paper: #ffffff;
+  --paper-dim: #a1a1aa;
+  --paper-faint: #52525b;
 
   /* Accents */
-  --signal: #5b8cff;
-  --signal-2: #8b5cf6;
-  --signal-3: #22d3ee;
+  --signal: #ffffff;
+  --signal-2: #818cf8;
+  --signal-3: #38bdf8;
   --accent-magenta: #e879f9;
   --accent-amber: #fbbf24;
-  --signal-wash: rgba(91, 140, 255, 0.12);
-  --signal-glow: rgba(91, 140, 255, 0.35);
-  --signal-border: rgba(91, 140, 255, 0.45);
+  --signal-wash: rgba(255, 255, 255, 0.05);
+  --signal-glow: rgba(255, 255, 255, 0.25);
+  --signal-border: rgba(255, 255, 255, 0.35);
   --success: #34d399;
   /* Soft multicolour washes for selected surfaces and interactions */
   --grad-accent: linear-gradient(
     135deg,
-    var(--signal) 0%,
-    var(--signal-2) 55%,
-    var(--signal-3) 120%
+    #ffffff 0%,
+    #a5b4fc 50%,
+    #38bdf8 100%
   );
   --grad-accent-soft: linear-gradient(
     120deg,
-    rgba(91, 140, 255, 0.16) 0%,
-    rgba(139, 92, 246, 0.12) 45%,
-    rgba(34, 211, 238, 0.1) 100%
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(129, 140, 248, 0.08) 50%,
+    rgba(56, 189, 248, 0.06) 100%
   );
 
   /* Elevation / interaction */
-  --hover-wash: rgba(148, 163, 204, 0.07);
-  --active-wash: rgba(91, 140, 255, 0.1);
-  --focus-ring: rgba(91, 140, 255, 0.65);
+  --hover-wash: rgba(255, 255, 255, 0.05);
+  --active-wash: rgba(255, 255, 255, 0.08);
+  --focus-ring: rgba(255, 255, 255, 0.5);
 
   /* Typography */
-  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
-  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-logo: "Syne", "Rethink Sans", "Space Grotesk", sans-serif;
+  --font-display: "Rethink Sans", "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Rethink Sans", "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono",
     ui-monospace, monospace;
 
