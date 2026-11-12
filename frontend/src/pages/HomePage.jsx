@@ -162,6 +162,59 @@ export function HomePage({ onAnalyzed, onNavigate, aiStatus, repoList, onOpenRep
         </div>
       </div>
 
+      {/* Full-Width Workspace Intelligence & Engine Status Panel */}
+      <div className="home-intelligence-grid">
+        <div className="intel-card glass-panel">
+          <div className="intel-header">
+            <span className="intel-dot" />
+            <h4>AST INGESTION ENGINE</h4>
+          </div>
+          <div className="intel-metric">v2.0 ACTIVE</div>
+          <p className="intel-desc">
+            Direct Python AST + JavaScript/TypeScript tokenizer parsing functions, classes, calls &amp; dependencies without third-party CLI requirements.
+          </p>
+          <div className="intel-tags">
+            <span className="intel-tag">.py</span>
+            <span className="intel-tag">.js</span>
+            <span className="intel-tag">.jsx</span>
+            <span className="intel-tag">.ts</span>
+            <span className="intel-tag">.tsx</span>
+          </div>
+        </div>
+
+        <div className="intel-card glass-panel">
+          <div className="intel-header">
+            <span className="intel-dot dot-cyan" />
+            <h4>EXECUTION FLOW RESOLVER</h4>
+          </div>
+          <div className="intel-metric">GRAPH STUDIO</div>
+          <p className="intel-desc">
+            Traces entry-point call chains, resolves ambiguous method candidates across files, and displays animated interactive dependency flows.
+          </p>
+          <div className="intel-tags">
+            <span className="intel-tag">Call Graphs</span>
+            <span className="intel-tag">Forward &amp; Reverse</span>
+            <span className="intel-tag">Dagre Layout</span>
+          </div>
+        </div>
+
+        <div className="intel-card glass-panel">
+          <div className="intel-header">
+            <span className="intel-dot dot-purple" />
+            <h4>EVIDENCE CITATION ENGINE</h4>
+          </div>
+          <div className="intel-metric">STRICT GROUNDING</div>
+          <p className="intel-desc">
+            Every AI statement is validated against extracted code blocks. Claims with unverifiable line citations are demoted into unverified notes.
+          </p>
+          <div className="intel-tags">
+            <span className="intel-tag">[file:line]</span>
+            <span className="intel-tag">Multi-LLM</span>
+            <span className="intel-tag">Zero Guessing</span>
+          </div>
+        </div>
+      </div>
+
       {loading && (
         <div className="loading-banner">
           <span className="spinner-dot" />
