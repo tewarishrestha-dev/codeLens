@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   BackgroundVariant,
   Controls,
@@ -314,48 +315,40 @@ function GraphCanvasInner({
   onNodeEnter,
   onNodeLeave,
 }) {
-  const { fitView } = useReactFlow();
-
-  // Expose fitView to parent via a callback ref — not needed here since
-  // the toolbar calls fitView from outside the ReactFlow provider.
-  // We keep it simple: the ReactFlow instance handles its own fitView.
-
   return (
-    <>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodeClick={onNodeClick}
-        onNodeMouseEnter={onNodeEnter}
-        onNodeMouseLeave={onNodeLeave}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }}
-        minZoom={0.05}
-        maxZoom={2.5}
-        nodesDraggable={true}
-        nodesConnectable={false}
-        panOnScroll={true}
-        zoomOnScroll={true}
-        defaultMarkerColor="var(--paper-faint)"
-      >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={26}
-          size={1.3}
-          color="var(--line-strong)"
-          bgColor="transparent"
-        />
-        <Controls showInteractive={false} />
-        <MiniMap
-          nodeStrokeColor="rgba(129, 140, 248, 0.6)"
-          nodeColor="rgba(129, 140, 248, 0.15)"
-          nodeBorderRadius={4}
-          maskColor="rgba(0, 0, 0, 0.7)"
-          style={{ backgroundColor: "rgba(10, 10, 20, 0.9)" }}
-        />
-      </ReactFlow>
-    </>
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodeClick={onNodeClick}
+      onNodeMouseEnter={onNodeEnter}
+      onNodeMouseLeave={onNodeLeave}
+      nodeTypes={nodeTypes}
+      fitView
+      fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }}
+      minZoom={0.05}
+      maxZoom={2.5}
+      nodesDraggable={true}
+      nodesConnectable={false}
+      panOnScroll={true}
+      zoomOnScroll={true}
+      defaultMarkerColor="var(--paper-faint)"
+    >
+      <Background
+        variant={BackgroundVariant.Dots}
+        gap={26}
+        size={1.3}
+        color="var(--line-strong)"
+        bgColor="transparent"
+      />
+      <Controls showInteractive={false} />
+      <MiniMap
+        nodeStrokeColor="rgba(129, 140, 248, 0.6)"
+        nodeColor="rgba(129, 140, 248, 0.15)"
+        nodeBorderRadius={4}
+        maskColor="rgba(0, 0, 0, 0.7)"
+        style={{ backgroundColor: "rgba(10, 10, 20, 0.9)" }}
+      />
+    </ReactFlow>
   );
 }
 
@@ -372,14 +365,16 @@ function GraphCanvas({
     <div className="graph-canvas-wrapper">
       {toolbar}
       <div className="graph-canvas">
-        <GraphCanvasInner
-          key={flowKey}
-          nodes={nodes}
-          edges={edges}
-          onNodeClick={onNodeClick}
-          onNodeEnter={onNodeEnter}
-          onNodeLeave={onNodeLeave}
-        />
+        <ReactFlowProvider>
+          <GraphCanvasInner
+            key={flowKey}
+            nodes={nodes}
+            edges={edges}
+            onNodeClick={onNodeClick}
+            onNodeEnter={onNodeEnter}
+            onNodeLeave={onNodeLeave}
+          />
+        </ReactFlowProvider>
       </div>
     </div>
   );

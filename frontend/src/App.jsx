@@ -44,7 +44,7 @@ function readStoredUser() {
 
 function App() {
   const [user, setUser] = useState(readStoredUser);
-  const [inWorkspace, setInWorkspace] = useState(() => Boolean(readStoredUser()));
+  const [inWorkspace, setInWorkspace] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const [page, setPage] = useState("home");
