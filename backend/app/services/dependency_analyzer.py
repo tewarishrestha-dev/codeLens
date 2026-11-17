@@ -69,6 +69,34 @@ def build_dependencies(code_analysis):
 
                 target = files.get(module)
 
+                # Fallback 1: Same-directory lookup — {file_dir}/{module}
+                if not target and file_dir:
+                    same_dir_key = f"{file_dir}/{module}"
+                    target = files.get(same_dir_key)
+
+                # Fallback 2: Parent-package lookup — walk up to package root
+                if not target and file_dir:
+                    dir_parts = file_dir.split("/")
+                    for i in range(len(dir_parts) - 1, 0, -1):
+                        pkg_key = "/".join(dir_parts[:i]) + "/" + module
+                        if pkg_key in files:
+                            target = files[pkg_key]
+                            break
+
+                # Fallback 3: Suffix-match — exactly one key ending with /{module}
+                if not target:
+                    suffix = "/" + module
+                    matches = [v for k, v in files.items() if k.endswith(suffix)]
+                    if len(matches) == 1:
+                        target = matches[0]
+
+                # Fallback 4: Extension-based lookup in all_paths
+                if not target:
+                    for ext in [".py", ".js", ".jsx", ".ts", ".tsx"]:
+                        if module + ext in all_paths:
+                            target = module + ext
+                            break
+
             if target and target != file_path:
                 if target not in dependencies[file_path]:
                     dependencies[file_path].append(target)

@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
+  MiniMap,
   MarkerType,
+  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import dagre from "@dagrejs/dagre";
@@ -108,14 +110,32 @@ function measureStepNode(file, fn) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Helpers — filtering
+ * ------------------------------------------------------------------ */
+
+function isTestFile(filePath) {
+  const lower = filePath.toLowerCase();
+  return (
+    lower.includes("test_") ||
+    lower.includes("_test.") ||
+    lower.includes("/tests/") ||
+    lower.includes("/test/") ||
+    lower.startsWith("tests/") ||
+    lower.startsWith("test/") ||
+    lower.includes(".test.") ||
+    lower.includes(".spec.")
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * Node components
  * ------------------------------------------------------------------ */
 
 function CodeFileNode({ data }) {
-  const { kind, kindLabel, fileName, directory, members, memberTotal } = data;
+  const { kind, kindLabel, fileName, directory, members, memberTotal, searchMatch } = data;
 
   return (
-    <div className={`gnode gnode--file gnode--${kind}`}>
+    <div className={`gnode gnode--file gnode--${kind}${searchMatch ? " gnode--search-match" : ""}`}>
       <div className="gnode__head">
         <span className="gnode__chip">
           <span className="gnode__chip-dot" aria-hidden="true" />
@@ -196,21 +216,113 @@ function FlowStepNode({ data }) {
 const nodeTypes = { codeFile: CodeFileNode, flowStep: FlowStepNode };
 
 /* ------------------------------------------------------------------ *
- * Shared canvas
+ * Graph Toolbar
  * ------------------------------------------------------------------ */
 
-function GraphCanvas({
-  flowKey,
+function GraphToolbar({
+  graphType,
+  rankdir,
+  onToggleRankdir,
+  connectedOnly,
+  onToggleConnectedOnly,
+  hideTests,
+  onToggleHideTests,
+  searchQuery,
+  onSearchChange,
+  onFitView,
+  stats,
+}) {
+  return (
+    <div className="graph-toolbar">
+      <div className="graph-toolbar__controls">
+        {/* Layout direction toggle */}
+        <button
+          className="graph-toolbar__btn"
+          onClick={onToggleRankdir}
+          title={`Switch to ${rankdir === "LR" ? "Top-Bottom" : "Left-Right"} layout`}
+        >
+          {rankdir === "LR" ? "→ LR" : "↓ TB"}
+        </button>
+
+        {/* Connected Only toggle — not shown for execution flow */}
+        {graphType !== "flow" && (
+          <button
+            className={`graph-toolbar__btn${connectedOnly ? " is-active" : ""}`}
+            onClick={onToggleConnectedOnly}
+            title="Show only nodes with connections"
+          >
+            {connectedOnly ? "Connected" : "All Nodes"}
+          </button>
+        )}
+
+        {/* Hide Tests toggle — not shown for execution flow */}
+        {graphType !== "flow" && (
+          <button
+            className={`graph-toolbar__btn${hideTests ? " is-active" : ""}`}
+            onClick={onToggleHideTests}
+            title="Hide test files"
+          >
+            {hideTests ? "Tests Hidden" : "Show Tests"}
+          </button>
+        )}
+
+        {/* Search */}
+        {graphType !== "flow" && (
+          <div className="graph-toolbar__search">
+            <span className="graph-toolbar__search-icon" aria-hidden="true">
+              ⌕
+            </span>
+            <input
+              type="text"
+              className="graph-toolbar__search-input"
+              placeholder="Search files…"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Fit View */}
+        <button className="graph-toolbar__btn" onClick={onFitView} title="Fit graph to view">
+          ⊞ Fit
+        </button>
+      </div>
+
+      {/* Stats bar */}
+      {stats && (
+        <div className="graph-toolbar__stats">
+          {stats.files != null && <span>{stats.files} files</span>}
+          {stats.edges != null && <span>·</span>}
+          {stats.edges != null && <span>{stats.edges} edges</span>}
+          {stats.entryPoints != null && <span>·</span>}
+          {stats.entryPoints != null && <span>{stats.entryPoints} entry points</span>}
+          {stats.steps != null && <span>{stats.steps} steps</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared canvas — now with MiniMap, pan/zoom, toolbar props
+ * ------------------------------------------------------------------ */
+
+function GraphCanvasInner({
   nodes,
   edges,
   onNodeClick,
   onNodeEnter,
   onNodeLeave,
 }) {
+  const { fitView } = useReactFlow();
+
+  // Expose fitView to parent via a callback ref — not needed here since
+  // the toolbar calls fitView from outside the ReactFlow provider.
+  // We keep it simple: the ReactFlow instance handles its own fitView.
+
   return (
-    <div className="graph-canvas">
+    <>
       <ReactFlow
-        key={flowKey}
         nodes={nodes}
         edges={edges}
         onNodeClick={onNodeClick}
@@ -218,11 +330,13 @@ function GraphCanvas({
         onNodeMouseLeave={onNodeLeave}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1.1 }}
-        minZoom={0.15}
-        maxZoom={2}
-        nodesDraggable={false}
+        fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }}
+        minZoom={0.05}
+        maxZoom={2.5}
+        nodesDraggable={true}
         nodesConnectable={false}
+        panOnScroll={true}
+        zoomOnScroll={true}
         defaultMarkerColor="var(--paper-faint)"
       >
         <Background
@@ -233,7 +347,40 @@ function GraphCanvas({
           bgColor="transparent"
         />
         <Controls showInteractive={false} />
+        <MiniMap
+          nodeStrokeColor="rgba(129, 140, 248, 0.6)"
+          nodeColor="rgba(129, 140, 248, 0.15)"
+          nodeBorderRadius={4}
+          maskColor="rgba(0, 0, 0, 0.7)"
+          style={{ backgroundColor: "rgba(10, 10, 20, 0.9)" }}
+        />
       </ReactFlow>
+    </>
+  );
+}
+
+function GraphCanvas({
+  flowKey,
+  nodes,
+  edges,
+  onNodeClick,
+  onNodeEnter,
+  onNodeLeave,
+  toolbar,
+}) {
+  return (
+    <div className="graph-canvas-wrapper">
+      {toolbar}
+      <div className="graph-canvas">
+        <GraphCanvasInner
+          key={flowKey}
+          nodes={nodes}
+          edges={edges}
+          onNodeClick={onNodeClick}
+          onNodeEnter={onNodeEnter}
+          onNodeLeave={onNodeLeave}
+        />
+      </div>
     </div>
   );
 }
@@ -251,16 +398,48 @@ function arrowMarker(color) {
  * Dependency graph (imports, left-to-right dagre layout)
  * ------------------------------------------------------------------ */
 
-function buildDependencyModel(result) {
+function buildDependencyModel(result, rankdir, connectedOnly, hideTests, searchQuery) {
   const forward = result.dependencies.forward || {};
   const reverse = result.dependencies.reverse || {};
-  const files = Object.keys(forward);
+  let files = Object.keys(forward);
   const entryPoints = buildEntrySet(result);
   const memberIndex = buildMemberIndex(result.architecture);
 
+  // Determine which files have edges (connected)
+  const connectedFiles = new Set();
+  files.forEach((file) => {
+    (forward[file] || []).forEach((dep) => {
+      if (files.includes(dep)) {
+        connectedFiles.add(file);
+        connectedFiles.add(dep);
+      }
+    });
+  });
+
+  // Apply filters
+  if (hideTests) {
+    files = files.filter((f) => !isTestFile(f));
+  }
+  if (connectedOnly) {
+    files = files.filter((f) => connectedFiles.has(f));
+  }
+
+  // Compute search matches
+  const lowerSearch = searchQuery.toLowerCase().trim();
+  const searchMatches = new Set();
+  if (lowerSearch) {
+    files.forEach((f) => {
+      if (f.toLowerCase().includes(lowerSearch)) {
+        searchMatches.add(f);
+      }
+    });
+  }
+
+  const fileSet = new Set(files);
+
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({ rankdir: "LR", nodesep: 72, ranksep: 150 });
+  graph.setGraph({ rankdir, nodesep: 80, ranksep: 180 });
 
   const meta = {};
 
@@ -292,7 +471,7 @@ function buildDependencyModel(result) {
   files.forEach((file) => {
     (forward[file] || []).forEach((dependency) => {
       const id = `${file}->${dependency}`;
-      if (seen.has(id) || !graph.hasNode(dependency)) return;
+      if (seen.has(id) || !fileSet.has(dependency)) return;
       seen.add(id);
       pairs.push({ source: file, target: dependency });
       graph.setEdge(file, dependency);
@@ -310,12 +489,22 @@ function buildDependencyModel(result) {
     };
   });
 
-  return { files, forward, reverse, meta, positions, pairs, entryPoints };
+  const entryCount = files.filter((f) => entryPoints.has(f)).length;
+
+  return { files, forward, reverse, meta, positions, pairs, entryPoints, searchMatches, entryCount };
 }
 
 export function DependencyGraph({ result, onFileClick, selectedFile }) {
   const [hoveredId, setHoveredId] = useState(null);
-  const model = useMemo(() => buildDependencyModel(result), [result]);
+  const [rankdir, setRankdir] = useState("LR");
+  const [connectedOnly, setConnectedOnly] = useState(true);
+  const [hideTests, setHideTests] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const model = useMemo(
+    () => buildDependencyModel(result, rankdir, connectedOnly, hideTests, searchQuery),
+    [result, rankdir, connectedOnly, hideTests, searchQuery]
+  );
 
   const related = useMemo(() => {
     if (!selectedFile) return null;
@@ -344,6 +533,7 @@ export function DependencyGraph({ result, onFileClick, selectedFile }) {
             directory: info.directory,
             members: info.members,
             memberTotal: info.memberTotal,
+            searchMatch: model.searchMatches.has(file),
           },
         };
       }),
@@ -371,21 +561,53 @@ export function DependencyGraph({ result, onFileClick, selectedFile }) {
           id: `dep:${source}->${target}`,
           source,
           target,
+          type: "smoothstep",
+          animated: entryFlow,
           className: classes.join(" "),
           ariaLabel: `${source} depends on ${target}`,
+          style: {
+            stroke: active ? undefined : "rgba(129, 140, 248, 0.5)",
+            strokeWidth: 2,
+          },
           markerEnd: arrowMarker(
-            active ? "var(--signal)" : "var(--paper-faint)"
+            active ? "var(--signal)" : "rgba(129, 140, 248, 0.5)"
           ),
         };
       }),
     [model, related, selectedFile, hoveredId]
   );
 
+  const stats = useMemo(
+    () => ({
+      files: model.files.length,
+      edges: model.pairs.length,
+      entryPoints: model.entryCount,
+    }),
+    [model]
+  );
+
+  const toolbar = (
+    <GraphToolbar
+      graphType="dependency"
+      rankdir={rankdir}
+      onToggleRankdir={() => setRankdir((d) => (d === "LR" ? "TB" : "LR"))}
+      connectedOnly={connectedOnly}
+      onToggleConnectedOnly={() => setConnectedOnly((v) => !v)}
+      hideTests={hideTests}
+      onToggleHideTests={() => setHideTests((v) => !v)}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      onFitView={() => {}}
+      stats={stats}
+    />
+  );
+
   return (
     <GraphCanvas
-      flowKey={result.tree.name}
+      flowKey={`${result.tree.name}-dep-${rankdir}-${connectedOnly}-${hideTests}`}
       nodes={nodes}
       edges={edges}
+      toolbar={toolbar}
       onNodeClick={(_event, node) => {
         onFileClick(`${result.tree.name}/${node.id}`);
       }}
@@ -399,8 +621,8 @@ export function DependencyGraph({ result, onFileClick, selectedFile }) {
  * Architecture graph (module-level dependencies, same LR layout)
  * ------------------------------------------------------------------ */
 
-function buildArchitectureModel(result) {
-  const files = result.architecture.files || [];
+function buildArchitectureModel(result, rankdir, connectedOnly, hideTests, searchQuery) {
+  let files = result.architecture.files || [];
   const directories = result.architecture.directories || {};
   const memberIndex = buildMemberIndex(result.architecture);
   const entryPoints = buildEntrySet(result);
@@ -413,9 +635,39 @@ function buildArchitectureModel(result) {
     });
   });
 
+  // Determine connected files from architecture dependencies
+  const connectedFiles = new Set();
+  (result.architecture.dependencies || []).forEach((dep) => {
+    if (files.includes(dep.from) && files.includes(dep.to)) {
+      connectedFiles.add(dep.from);
+      connectedFiles.add(dep.to);
+    }
+  });
+
+  // Apply filters
+  if (hideTests) {
+    files = files.filter((f) => !isTestFile(f));
+  }
+  if (connectedOnly) {
+    files = files.filter((f) => connectedFiles.has(f));
+  }
+
+  // Compute search matches
+  const lowerSearch = searchQuery.toLowerCase().trim();
+  const searchMatches = new Set();
+  if (lowerSearch) {
+    files.forEach((f) => {
+      if (f.toLowerCase().includes(lowerSearch)) {
+        searchMatches.add(f);
+      }
+    });
+  }
+
+  const fileSet = new Set(files);
+
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({ rankdir: "LR", nodesep: 72, ranksep: 150 });
+  graph.setGraph({ rankdir, nodesep: 80, ranksep: 180 });
 
   const meta = {};
 
@@ -446,7 +698,7 @@ function buildArchitectureModel(result) {
   (result.architecture.dependencies || []).forEach((dependency) => {
     const { from, to } = dependency;
     const id = `${from}->${to}`;
-    if (seen.has(id) || !graph.hasNode(from) || !graph.hasNode(to)) return;
+    if (seen.has(id) || !fileSet.has(from) || !fileSet.has(to)) return;
     seen.add(id);
     pairs.push({ source: from, target: to });
     graph.setEdge(from, to);
@@ -463,12 +715,22 @@ function buildArchitectureModel(result) {
     };
   });
 
-  return { files, meta, positions, pairs, entryPoints };
+  const entryCount = files.filter((f) => entryPoints.has(f)).length;
+
+  return { files, meta, positions, pairs, entryPoints, searchMatches, entryCount };
 }
 
 export function ArchitectureGraph({ result, onFileClick, selectedFile }) {
   const [hoveredId, setHoveredId] = useState(null);
-  const model = useMemo(() => buildArchitectureModel(result), [result]);
+  const [rankdir, setRankdir] = useState("LR");
+  const [connectedOnly, setConnectedOnly] = useState(true);
+  const [hideTests, setHideTests] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const model = useMemo(
+    () => buildArchitectureModel(result, rankdir, connectedOnly, hideTests, searchQuery),
+    [result, rankdir, connectedOnly, hideTests, searchQuery]
+  );
 
   const nodes = useMemo(
     () =>
@@ -497,6 +759,7 @@ export function ArchitectureGraph({ result, onFileClick, selectedFile }) {
             directory: info.directory,
             members: info.members,
             memberTotal: info.memberTotal,
+            searchMatch: model.searchMatches.has(file),
           },
         };
       }),
@@ -529,21 +792,53 @@ export function ArchitectureGraph({ result, onFileClick, selectedFile }) {
           id: `arch:${source}->${target}`,
           source,
           target,
+          type: "smoothstep",
+          animated: entryFlow,
           className: classes.join(" "),
           ariaLabel: `${source} depends on ${target}`,
+          style: {
+            stroke: active ? undefined : "rgba(129, 140, 248, 0.5)",
+            strokeWidth: 2,
+          },
           markerEnd: arrowMarker(
-            active ? "var(--signal)" : "var(--paper-faint)"
+            active ? "var(--signal)" : "rgba(129, 140, 248, 0.5)"
           ),
         };
       }),
     [model, selectedFile, hoveredId]
   );
 
+  const stats = useMemo(
+    () => ({
+      files: model.files.length,
+      edges: model.pairs.length,
+      entryPoints: model.entryCount,
+    }),
+    [model]
+  );
+
+  const toolbar = (
+    <GraphToolbar
+      graphType="architecture"
+      rankdir={rankdir}
+      onToggleRankdir={() => setRankdir((d) => (d === "LR" ? "TB" : "LR"))}
+      connectedOnly={connectedOnly}
+      onToggleConnectedOnly={() => setConnectedOnly((v) => !v)}
+      hideTests={hideTests}
+      onToggleHideTests={() => setHideTests((v) => !v)}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      onFitView={() => {}}
+      stats={stats}
+    />
+  );
+
   return (
     <GraphCanvas
-      flowKey={result.tree.name}
+      flowKey={`${result.tree.name}-arch-${rankdir}-${connectedOnly}-${hideTests}`}
       nodes={nodes}
       edges={edges}
+      toolbar={toolbar}
       onNodeClick={(_event, node) => {
         onFileClick(`${result.tree.name}/${node.id}`);
       }}
@@ -591,6 +886,8 @@ export function ExecutionFlow({
   repoName,
   selectedFile,
 }) {
+  const [rankdir, setRankdir] = useState("TB");
+
   const model = useMemo(
     () => buildFlowModel(executionFlow),
     [executionFlow]
@@ -653,17 +950,42 @@ export function ExecutionFlow({
           source: String(index),
           target: String(index + 1),
           type: "smoothstep",
+          animated: true,
           className: classes.join(" "),
           ariaLabel: `Step ${index + 1} to step ${index + 2}`,
+          style: {
+            strokeWidth: 2,
+            animationDelay: `${index * -0.32}s`,
+          },
           markerEnd: arrowMarker(
             active ? "var(--signal)" : "var(--signal-3)"
           ),
-          // Staggered negative delays make the chain read as a sequence
-          // travelling from START to END rather than a simultaneous pulse.
-          style: { animationDelay: `${index * -0.32}s` },
         };
       }),
     [executionFlow, selectedStep]
+  );
+
+  const stats = useMemo(
+    () => ({
+      steps: executionFlow.length,
+    }),
+    [executionFlow]
+  );
+
+  const toolbar = (
+    <GraphToolbar
+      graphType="flow"
+      rankdir={rankdir}
+      onToggleRankdir={() => setRankdir((d) => (d === "TB" ? "LR" : "TB"))}
+      connectedOnly={false}
+      onToggleConnectedOnly={() => {}}
+      hideTests={false}
+      onToggleHideTests={() => {}}
+      searchQuery=""
+      onSearchChange={() => {}}
+      onFitView={() => {}}
+      stats={stats}
+    />
   );
 
   return (
@@ -671,6 +993,7 @@ export function ExecutionFlow({
       flowKey={repoName}
       nodes={nodes}
       edges={edges}
+      toolbar={toolbar}
       onNodeClick={(_event, node) => {
         const step = executionFlow[Number(node.id)];
 

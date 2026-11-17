@@ -3733,5 +3733,150 @@ pre {
   will-change: transform;
 }
 
+/* ==========================================================================
+   Graph Studio Toolbar, Minimap & 2D Canvas Overhaul
+   ========================================================================== */
+
+.graph-canvas-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  position: relative;
+}
+
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(12, 12, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.graph-toolbar__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.graph-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--paper-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.graph-toolbar__btn:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.graph-toolbar__btn.is-active {
+  color: #818cf8;
+  border-color: rgba(129, 140, 248, 0.5);
+  background: rgba(129, 140, 248, 0.12);
+  box-shadow: 0 0 12px rgba(129, 140, 248, 0.2);
+}
+
+.graph-toolbar__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  transition: border-color 0.18s ease;
+}
+
+.graph-toolbar__search:focus-within {
+  border-color: rgba(129, 140, 248, 0.6);
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.2);
+}
+
+.graph-toolbar__search-icon {
+  font-size: 13px;
+  color: var(--paper-faint);
+  line-height: 1;
+}
+
+.graph-toolbar__search-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  width: 120px;
+  transition: width 0.2s ease;
+}
+
+.graph-toolbar__search-input:focus {
+  width: 170px;
+}
+
+.graph-toolbar__search-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.graph-toolbar__stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-faint);
+  letter-spacing: 0.03em;
+}
+
+.graph-toolbar__stats span {
+  display: inline-block;
+}
+
+/* ReactFlow canvas inside the wrapper */
+.graph-canvas-wrapper .graph-canvas {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: none;
+}
+
+/* Node search highlight glow */
+.gnode--search-match {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.5), 0 12px 28px rgba(0, 0, 0, 0.6) !important;
+  transform: scale(1.04);
+}
+
+/* ReactFlow MiniMap custom styling */
+.react-flow__minimap {
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7) !important;
+}
+
 
 
